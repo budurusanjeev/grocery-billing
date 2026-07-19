@@ -1,18 +1,23 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { BillProvider } from '../state/bill';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <BillProvider>
+      <StatusBar style="light" />
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: '#166534' },
+          headerTintColor: '#ffffff',
+          headerTitleStyle: { fontWeight: '700' },
+        }}
+      >
+        <Stack.Screen name="index" options={{ title: 'Kirana Bill' }} />
+        <Stack.Screen name="catalog" options={{ title: 'Catalog & Prices' }} />
+        <Stack.Screen name="scan" options={{ title: 'Scan Paper List' }} />
+        <Stack.Screen name="voice" options={{ title: 'Voice Billing' }} />
+      </Stack>
+    </BillProvider>
   );
 }
