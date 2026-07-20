@@ -11,8 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, type Item } from '../lib/db';
 import { matchItem } from '../lib/matcher';
+import { cardShadow, colors, radius, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { parseTranscript } from '../lib/voiceParser';
 import { useBill } from '../state/bill';
@@ -108,148 +110,156 @@ export default function VoiceScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.langRow}>
-        {LANGUAGES.map((l) => (
-          <TouchableOpacity
-            key={l.code}
-            style={[styles.langChip, lang === l.code && styles.langChipActive]}
-            onPress={() => !listening && setLang(l.code)}
-          >
-            <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>
-              {l.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.micBtn, listening && styles.micBtnActive]}
-        onPress={toggleListening}
-      >
-        <Text style={styles.micIcon}>🎤</Text>
-        <Text style={styles.micLabel}>
-          {listening ? 'Listening… tap to stop' : 'Tap to speak'}
-        </Text>
-      </TouchableOpacity>
-
-      {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
-
-      <Text style={styles.hint}>
-        Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
-      </Text>
-
-      {unmatched.length > 0 && (
-        <View style={styles.unmatchedBox}>
-          <Text style={styles.unmatchedTitle}>Not understood:</Text>
-          <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
+    <ScreenContainer>
+      <View style={styles.screen}>
+        <View style={styles.langRow}>
+          {LANGUAGES.map((l) => (
+            <TouchableOpacity
+              key={l.code}
+              style={[styles.langChip, lang === l.code && styles.langChipActive]}
+              onPress={() => !listening && setLang(l.code)}
+            >
+              <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>
+                {l.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      )}
 
-      <FlatList
-        style={styles.list}
-        data={lines}
-        keyExtractor={(l) => l.itemId}
-        ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
-        renderItem={({ item: l }) => (
-          <View style={styles.lineRow}>
-            <Text style={styles.lineName}>{l.name}</Text>
-            <Text style={styles.lineMeta}>
-              {l.qty} {l.unit} × {formatMoney(l.price)} = {formatMoney(l.price * l.qty)}
-            </Text>
+        <TouchableOpacity
+          style={[styles.micBtn, listening && styles.micBtnActive]}
+          onPress={toggleListening}
+        >
+          <Text style={styles.micIcon}>🎤</Text>
+          <Text style={styles.micLabel}>
+            {listening ? 'Listening… tap to stop' : 'Tap to speak'}
+          </Text>
+        </TouchableOpacity>
+
+        {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
+
+        <Text style={styles.hint}>
+          Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
+        </Text>
+
+        {unmatched.length > 0 && (
+          <View style={styles.unmatchedBox}>
+            <Text style={styles.unmatchedTitle}>Not understood:</Text>
+            <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
           </View>
         )}
-      />
 
-      <View style={styles.totalBar}>
-        <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+        <FlatList
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          data={lines}
+          keyExtractor={(l) => l.itemId}
+          ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
+          renderItem={({ item: l }) => (
+            <View style={styles.lineRow}>
+              <Text style={styles.lineName}>{l.name}</Text>
+              <Text style={styles.lineMeta}>
+                {l.qty} {l.unit} × {formatMoney(l.price)} = {formatMoney(l.price * l.qty)}
+              </Text>
+            </View>
+          )}
+        />
+
+        <View style={styles.totalBar}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.doneBtn}
+          onPress={() => {
+            // After a browser refresh there is no history, so "back" has
+            // nowhere to go — fall back to the billing screen directly.
+            if (router.canGoBack()) router.back();
+            else router.replace('/');
+          }}
+        >
+          <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={styles.doneBtn}
-        onPress={() => {
-          // After a browser refresh there is no history, so "back" has
-          // nowhere to go — fall back to the billing screen directly.
-          if (router.canGoBack()) router.back();
-          else router.replace('/');
-        }}
-      >
-        <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
-      </TouchableOpacity>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc', padding: 12 },
+  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
   langRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
   langChip: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.borderStrong,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
   },
-  langChipActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  langChipActive: { backgroundColor: colors.accentPurple, borderColor: colors.accentPurple },
   langText: { fontSize: 15, color: '#334155' },
   langTextActive: { color: '#ffffff', fontWeight: '700' },
   micBtn: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 16,
+    backgroundColor: colors.accentPurple,
+    borderRadius: radius.xl,
     paddingVertical: 22,
     alignItems: 'center',
     marginTop: 14,
+    ...cardShadow,
   },
-  micBtnActive: { backgroundColor: '#dc2626' },
+  micBtnActive: { backgroundColor: colors.accentRed },
   micIcon: { fontSize: 34 },
   micLabel: { color: '#ffffff', fontSize: 16, fontWeight: '700', marginTop: 6 },
   interim: {
     marginTop: 10,
     fontSize: 16,
-    color: '#0f172a',
+    color: colors.text,
     backgroundColor: '#ede9fe',
-    borderRadius: 8,
+    borderRadius: radius.sm,
     padding: 10,
   },
-  hint: { marginTop: 8, fontSize: 13, color: '#64748b', textAlign: 'center' },
+  hint: { marginTop: 8, fontSize: 13, color: colors.textMuted, textAlign: 'center' },
   unmatchedBox: {
     backgroundColor: '#fef2f2',
-    borderRadius: 8,
+    borderRadius: radius.sm,
     padding: 10,
     marginTop: 8,
   },
   unmatchedTitle: { color: '#b91c1c', fontWeight: '700', fontSize: 13 },
   unmatchedText: { color: '#b91c1c', fontSize: 13 },
   list: { flex: 1, marginTop: 10 },
-  empty: { textAlign: 'center', color: '#94a3b8', marginTop: 30, fontSize: 14 },
+  listContent: { paddingBottom: spacing.listBottom },
+  empty: { textAlign: 'center', color: colors.textFaint, marginTop: 30, fontSize: 14 },
   lineRow: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
     padding: 10,
-    marginBottom: 6,
+    marginBottom: 7,
+    ...cardShadow,
   },
-  lineName: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  lineMeta: { fontSize: 13, color: '#166534' },
+  lineName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  lineMeta: { fontSize: 13, color: colors.brand },
   totalBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#166534',
-    borderRadius: 12,
+    backgroundColor: colors.brand,
+    borderRadius: radius.lg,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginTop: 6,
+    ...cardShadow,
   },
-  totalLabel: { color: '#bbf7d0', fontSize: 16, fontWeight: '600' },
-  totalValue: { color: '#ffffff', fontSize: 24, fontWeight: '800' },
+  totalLabel: { color: colors.brandLight, fontSize: 16, fontWeight: '600' },
+  totalValue: { color: '#ffffff', fontSize: 26, fontWeight: '800' },
   doneBtn: {
     backgroundColor: '#16a34a',
-    borderRadius: 10,
+    borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+    ...cardShadow,
   },
   doneBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
 });

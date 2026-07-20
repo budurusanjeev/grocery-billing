@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Header from '../components/Header';
+import { colors } from '../lib/theme';
 import { BillProvider } from '../state/bill';
 
 export default function RootLayout() {
@@ -8,15 +10,27 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#166534' },
+          headerStyle: { backgroundColor: colors.brand },
           headerTintColor: '#ffffff',
-          headerTitleStyle: { fontWeight: '700' },
+          headerShadowVisible: false,
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Kirana Bill' }} />
-        <Stack.Screen name="catalog" options={{ title: 'Catalog & Prices' }} />
-        <Stack.Screen name="scan" options={{ title: 'Scan Paper List' }} />
-        <Stack.Screen name="voice" options={{ title: 'Voice Billing' }} />
+        <Stack.Screen
+          name="index"
+          options={{ headerTitle: () => <Header icon="🛒" title="Kirana Bill" subtitle="Billing" /> }}
+        />
+        <Stack.Screen
+          name="catalog"
+          options={{ headerTitle: () => <Header icon="🏷" title="Catalog" subtitle="Prices & items" /> }}
+        />
+        <Stack.Screen
+          name="scan"
+          options={{ headerTitle: () => <Header icon="📷" title="Scan List" subtitle="Paper → bill" /> }}
+        />
+        <Stack.Screen
+          name="voice"
+          options={{ headerTitle: () => <Header icon="🎤" title="Voice Billing" subtitle="Speak items" /> }}
+        />
       </Stack>
     </BillProvider>
   );

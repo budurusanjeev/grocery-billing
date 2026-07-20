@@ -11,9 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, type Item } from '../lib/db';
 import { parseGroceryPhoto } from '../lib/gemini';
 import { matchItem } from '../lib/matcher';
+import { cardShadow, colors, radius, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
@@ -89,131 +91,151 @@ export default function ScanScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.pickRow}>
-        {Platform.OS !== 'web' && (
-          <TouchableOpacity style={styles.pickBtn} onPress={() => pick(true)}>
-            <Text style={styles.pickBtnText}>📷 Camera</Text>
+    <ScreenContainer>
+      <View style={styles.screen}>
+        <View style={styles.pickRow}>
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity style={styles.pickBtn} onPress={() => pick(true)}>
+              <Text style={styles.pickBtnText}>📷 Camera</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.pickBtn} onPress={() => pick(false)}>
+            <Text style={styles.pickBtnText}>🖼 Choose Photo</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.pickBtn} onPress={() => pick(false)}>
-          <Text style={styles.pickBtnText}>🖼 Choose Photo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#166534" />
-          <Text style={styles.loadingText}>
-            Reading the list… (the first scan of the day can take up to a minute while the server
-            wakes up)
-          </Text>
         </View>
-      )}
 
-      {error && <Text style={styles.error}>{error}</Text>}
-
-      {!loading && rows.length > 0 && (
-        <>
-          <Text style={styles.hint}>Check the items, fix quantities, then add to bill:</Text>
-          <FlatList
-            style={styles.list}
-            data={rows}
-            keyExtractor={(_, i) => String(i)}
-            renderItem={({ item: row, index }) => (
-              <TouchableOpacity
-                style={[styles.row, !row.match && styles.rowUnmatched]}
-                onPress={() =>
-                  row.match &&
-                  setRows((prev) =>
-                    prev.map((r, i) => (i === index ? { ...r, checked: !r.checked } : r)),
-                  )
-                }
-              >
-                <Text style={styles.check}>{row.checked ? '☑' : '☐'}</Text>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowParsed}>{row.parsedName}</Text>
-                  {row.match ? (
-                    <Text style={styles.rowMatch}>
-                      → {row.match.name_en} · {formatMoney(row.match.price)}/{row.match.unit}
-                    </Text>
-                  ) : (
-                    <Text style={styles.rowNoMatch}>Not in catalog — add it from Prices screen</Text>
-                  )}
-                </View>
-                <TextInput
-                  style={styles.qtyEdit}
-                  defaultValue={String(row.qty)}
-                  keyboardType="numeric"
-                  onEndEditing={(e) => {
-                    const q = parseFloat(e.nativeEvent.text);
-                    if (!isNaN(q) && q > 0) {
-                      setRows((prev) => prev.map((r, i) => (i === index ? { ...r, qty: q } : r)));
-                    }
-                  }}
-                />
-              </TouchableOpacity>
-            )}
-          />
-          <TouchableOpacity style={styles.addBtn} onPress={addSelected}>
-            <Text style={styles.addBtnText}>
-              ➕ Add {rows.filter((r) => r.checked && r.match).length} items to bill
+        {!loading && rows.length === 0 && !error && (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyIcon}>🧾</Text>
+            <Text style={styles.emptyText}>
+              Take or choose a photo of a handwritten grocery list — items get matched to the
+              catalog automatically, and you confirm before anything's added.
             </Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
+          </View>
+        )}
+
+        {loading && (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.brand} />
+            <Text style={styles.loadingText}>
+              Reading the list… (the first scan of the day can take up to a minute while the server
+              wakes up)
+            </Text>
+          </View>
+        )}
+
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        {!loading && rows.length > 0 && (
+          <>
+            <Text style={styles.hint}>Check the items, fix quantities, then add to bill:</Text>
+            <FlatList
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              data={rows}
+              keyExtractor={(_, i) => String(i)}
+              renderItem={({ item: row, index }) => (
+                <TouchableOpacity
+                  style={[styles.row, !row.match && styles.rowUnmatched]}
+                  onPress={() =>
+                    row.match &&
+                    setRows((prev) =>
+                      prev.map((r, i) => (i === index ? { ...r, checked: !r.checked } : r)),
+                    )
+                  }
+                >
+                  <Text style={styles.check}>{row.checked ? '☑' : '☐'}</Text>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowParsed}>{row.parsedName}</Text>
+                    {row.match ? (
+                      <Text style={styles.rowMatch}>
+                        → {row.match.name_en} · {formatMoney(row.match.price)}/{row.match.unit}
+                      </Text>
+                    ) : (
+                      <Text style={styles.rowNoMatch}>Not in catalog — add it from Prices screen</Text>
+                    )}
+                  </View>
+                  <TextInput
+                    style={styles.qtyEdit}
+                    defaultValue={String(row.qty)}
+                    keyboardType="numeric"
+                    onEndEditing={(e) => {
+                      const q = parseFloat(e.nativeEvent.text);
+                      if (!isNaN(q) && q > 0) {
+                        setRows((prev) => prev.map((r, i) => (i === index ? { ...r, qty: q } : r)));
+                      }
+                    }}
+                  />
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={styles.addBtn} onPress={addSelected}>
+              <Text style={styles.addBtnText}>
+                ➕ Add {rows.filter((r) => r.checked && r.match).length} items to bill
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc', padding: 12 },
+  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
   pickRow: { flexDirection: 'row', gap: 8 },
   pickBtn: {
     flex: 1,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 10,
+    backgroundColor: colors.accentBlue,
+    borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: 'center',
+    ...cardShadow,
   },
   pickBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
-  loadingText: { color: '#334155', fontSize: 15 },
-  error: { color: '#dc2626', marginTop: 12, fontSize: 14, lineHeight: 20 },
+  emptyBox: { alignItems: 'center', marginTop: 40, paddingHorizontal: 20 },
+  emptyIcon: { fontSize: 40, marginBottom: 10, opacity: 0.5 },
+  emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 14, lineHeight: 21 },
+  loadingText: { color: '#334155', fontSize: 15, textAlign: 'center' },
+  error: { color: colors.accentRed, marginTop: 12, fontSize: 14, lineHeight: 20 },
   hint: { color: '#334155', marginVertical: 10, fontSize: 14 },
   list: { flex: 1 },
+  listContent: { paddingBottom: spacing.listBottom },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
     padding: 10,
-    marginBottom: 6,
+    marginBottom: 7,
     gap: 8,
+    ...cardShadow,
   },
-  rowUnmatched: { opacity: 0.6, backgroundColor: '#fef2f2' },
-  check: { fontSize: 20, color: '#166534' },
+  rowUnmatched: { opacity: 0.7, backgroundColor: '#fef2f2' },
+  check: { fontSize: 20, color: colors.brand },
   rowInfo: { flex: 1 },
-  rowParsed: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  rowMatch: { fontSize: 13, color: '#166534' },
-  rowNoMatch: { fontSize: 13, color: '#dc2626' },
+  rowParsed: { fontSize: 15, fontWeight: '600', color: colors.text },
+  rowMatch: { fontSize: 13, color: colors.brand },
+  rowNoMatch: { fontSize: 13, color: colors.accentRed },
   qtyEdit: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 15,
     minWidth: 56,
     textAlign: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
   },
   addBtn: {
     backgroundColor: '#16a34a',
-    borderRadius: 10,
+    borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+    ...cardShadow,
   },
   addBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
 });

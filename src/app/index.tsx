@@ -9,8 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, saveBill, type Item } from '../lib/db';
 import { searchItems } from '../lib/matcher';
+import { cardShadow, colors, radius, spacing } from '../lib/theme';
 import { confirmDialog, formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
@@ -44,120 +46,132 @@ export default function BillingScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <TextInput
-        style={styles.search}
-        placeholder="Search item… (rice, pappu, sabbu)"
-        placeholderTextColor="#94a3b8"
-        value={query}
-        onChangeText={setQuery}
-      />
-      {results.length > 0 && (
-        <View style={styles.results}>
-          {results.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.resultRow}
-              onPress={() => {
-                addLine(item);
-                setQuery('');
-              }}
-            >
-              <Text style={styles.resultName}>
-                {item.name_en}
-                {item.brand ? ` (${item.brand})` : ''}
-              </Text>
-              <Text style={styles.resultTe}>{item.name_te}</Text>
-              <Text style={styles.resultPrice}>
-                {formatMoney(item.price)}/{item.unit}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      <FlatList
-        style={styles.billList}
-        data={lines}
-        keyExtractor={(l) => l.itemId}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            Bill is empty.{'\n'}Search above, or use Voice / Scan below.
-          </Text>
-        }
-        renderItem={({ item: l }) => (
-          <View style={styles.billRow}>
-            <View style={styles.billInfo}>
-              <Text style={styles.billName}>{l.name}</Text>
-              <Text style={styles.billMeta}>
-                {l.qty} {l.unit} × {formatMoney(l.price)}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty - 1)}>
-              <Text style={styles.qtyBtnText}>−</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty + 1)}>
-              <Text style={styles.qtyBtnText}>+</Text>
-            </TouchableOpacity>
-            <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
-            <TouchableOpacity onPress={() => removeLine(l.itemId)}>
-              <Text style={styles.remove}>✕</Text>
-            </TouchableOpacity>
+    <ScreenContainer>
+      <View style={styles.screen}>
+        <TextInput
+          style={styles.search}
+          placeholder="Search item… (rice, pappu, sabbu)"
+          placeholderTextColor={colors.textFaint}
+          value={query}
+          onChangeText={setQuery}
+        />
+        {results.length > 0 && (
+          <View style={styles.results}>
+            {results.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.resultRow}
+                onPress={() => {
+                  addLine(item);
+                  setQuery('');
+                }}
+              >
+                <Text style={styles.resultName}>
+                  {item.name_en}
+                  {item.brand ? ` (${item.brand})` : ''}
+                </Text>
+                <Text style={styles.resultTe}>{item.name_te}</Text>
+                <Text style={styles.resultPrice}>
+                  {formatMoney(item.price)}/{item.unit}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
-      />
 
-      <View style={styles.totalBar}>
-        <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalValue}>{formatMoney(total)}</Text>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity style={[styles.action, styles.voice]} onPress={() => router.push('/voice')}>
-          <Text style={styles.actionText}>🎤 Voice</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.scan]} onPress={() => router.push('/scan')}>
-          <Text style={styles.actionText}>📷 Scan</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.catalog]} onPress={() => router.push('/catalog')}>
-          <Text style={styles.actionText}>🏷 Prices</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.action, styles.newBill]}
-          onPress={() =>
-            lines.length > 0 && confirmDialog('New bill', 'Clear the current bill?', clear)
+        <FlatList
+          style={styles.billList}
+          contentContainerStyle={styles.listContent}
+          data={lines}
+          keyExtractor={(l) => l.itemId}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>🧾</Text>
+              <Text style={styles.empty}>
+                Bill is empty.{'\n'}Search above, or use Voice / Scan below.
+              </Text>
+            </View>
           }
-        >
-          <Text style={styles.actionText}>🗑 New Bill</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.save]} onPress={onSaveBill}>
-          <Text style={styles.actionText}>💾 Save Bill</Text>
-        </TouchableOpacity>
+          renderItem={({ item: l }) => (
+            <View style={styles.billRow}>
+              <View style={styles.billInfo}>
+                <Text style={styles.billName}>{l.name}</Text>
+                <Text style={styles.billMeta}>
+                  {l.qty} {l.unit} × {formatMoney(l.price)}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty - 1)}>
+                <Text style={styles.qtyBtnText}>−</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty + 1)}>
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+              <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
+              <TouchableOpacity onPress={() => removeLine(l.itemId)}>
+                <Text style={styles.remove}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+
+        <View style={styles.totalBar}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity style={[styles.action, styles.voice]} onPress={() => router.push('/voice')}>
+            <Text style={styles.actionIcon}>🎤</Text>
+            <Text style={styles.actionText}>Voice</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.action, styles.scan]} onPress={() => router.push('/scan')}>
+            <Text style={styles.actionIcon}>📷</Text>
+            <Text style={styles.actionText}>Scan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.action, styles.catalog]} onPress={() => router.push('/catalog')}>
+            <Text style={styles.actionIcon}>🏷</Text>
+            <Text style={styles.actionText}>Prices</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.action, styles.newBill]}
+            onPress={() =>
+              lines.length > 0 && confirmDialog('New bill', 'Clear the current bill?', clear)
+            }
+          >
+            <Text style={styles.actionIcon}>🗑</Text>
+            <Text style={styles.actionText}>New Bill</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.action, styles.save]} onPress={onSaveBill}>
+            <Text style={styles.actionIcon}>💾</Text>
+            <Text style={styles.actionText}>Save Bill</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc', padding: 12 },
+  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
   search: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    ...cardShadow,
   },
   results: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    marginTop: 4,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    marginTop: 6,
+    overflow: 'hidden',
+    ...cardShadow,
   },
   resultRow: {
     flexDirection: 'row',
@@ -168,57 +182,65 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  resultName: { fontSize: 15, fontWeight: '600', color: '#0f172a', flexShrink: 1 },
-  resultTe: { fontSize: 13, color: '#64748b', flex: 1 },
-  resultPrice: { fontSize: 14, fontWeight: '700', color: '#166534' },
+  resultName: { fontSize: 15, fontWeight: '600', color: colors.text, flexShrink: 1 },
+  resultTe: { fontSize: 13, color: colors.textMuted, flex: 1 },
+  resultPrice: { fontSize: 14, fontWeight: '700', color: colors.brand },
   billList: { flex: 1, marginTop: 10 },
-  empty: { textAlign: 'center', color: '#94a3b8', marginTop: 40, fontSize: 15, lineHeight: 24 },
+  listContent: { paddingBottom: spacing.listBottom },
+  emptyBox: { alignItems: 'center', marginTop: 36 },
+  emptyIcon: { fontSize: 40, marginBottom: 8, opacity: 0.5 },
+  empty: { textAlign: 'center', color: colors.textFaint, fontSize: 15, lineHeight: 24 },
   billRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
     padding: 10,
-    marginBottom: 6,
+    marginBottom: 7,
     gap: 8,
+    ...cardShadow,
   },
   billInfo: { flex: 1 },
-  billName: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  billMeta: { fontSize: 13, color: '#64748b' },
+  billName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  billMeta: { fontSize: 13, color: colors.textMuted },
   qtyBtn: {
     width: 34,
     height: 34,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
+    borderRadius: radius.sm,
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyBtnText: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  lineTotal: { fontSize: 15, fontWeight: '700', color: '#166534', minWidth: 60, textAlign: 'right' },
-  remove: { color: '#dc2626', fontSize: 16, paddingHorizontal: 6 },
+  qtyBtnText: { fontSize: 18, fontWeight: '700', color: colors.text },
+  lineTotal: { fontSize: 15, fontWeight: '700', color: colors.brand, minWidth: 60, textAlign: 'right' },
+  remove: { color: colors.accentRed, fontSize: 16, paddingHorizontal: 6 },
   totalBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#166534',
-    borderRadius: 12,
+    backgroundColor: colors.brand,
+    borderRadius: radius.lg,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     marginTop: 6,
+    ...cardShadow,
   },
-  totalLabel: { color: '#bbf7d0', fontSize: 16, fontWeight: '600' },
-  totalValue: { color: '#ffffff', fontSize: 24, fontWeight: '800' },
+  totalLabel: { color: colors.brandLight, fontSize: 16, fontWeight: '600' },
+  totalValue: { color: '#ffffff', fontSize: 26, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   action: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: radius.md,
+    paddingVertical: 12,
     alignItems: 'center',
+    gap: 3,
+    ...cardShadow,
   },
-  voice: { backgroundColor: '#7c3aed' },
-  scan: { backgroundColor: '#0ea5e9' },
-  catalog: { backgroundColor: '#f59e0b' },
+  voice: { backgroundColor: colors.accentPurple },
+  scan: { backgroundColor: colors.accentBlue },
+  catalog: { backgroundColor: colors.accentAmber },
   newBill: { backgroundColor: '#64748b' },
   save: { backgroundColor: '#16a34a' },
-  actionText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  actionIcon: { fontSize: 18 },
+  actionText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 });
