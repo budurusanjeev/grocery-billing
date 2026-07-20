@@ -1,9 +1,12 @@
 // Sends a photo of a handwritten grocery list (English / Telugu / Urdu) to
-// our own backend, which calls the Gemini API server-side. The API key
-// lives only on the server (GEMINI_API_KEY env var on Render) — it is never
-// bundled into this app, so nothing secret ships to the browser or phone.
+// our own backend (the server/ folder in this repo), which calls the Gemini
+// API server-side. The API key lives only on the server (GEMINI_API_KEY env
+// var) — it is never bundled into this app, so nothing secret ships to the
+// browser or phone.
 //
-// Backend endpoint: school-bus-backend repo, POST /api/v1/grocery/scan
+// EXPO_PUBLIC_SCAN_URL points at the deployed server (set on Render for the
+// static site); the localhost default is for local development where you
+// run `node server/index.js` alongside `npx expo start`.
 
 export interface ScannedItem {
   name: string;
@@ -11,7 +14,8 @@ export interface ScannedItem {
   unit: string;
 }
 
-const SCAN_ENDPOINT = 'https://school-bus-backend-2.onrender.com/api/v1/grocery/scan';
+const SCAN_ENDPOINT =
+  process.env.EXPO_PUBLIC_SCAN_URL ?? 'http://localhost:5050/api/v1/scan';
 
 export async function parseGroceryPhoto(base64: string, mimeType: string): Promise<ScannedItem[]> {
   const res = await fetch(SCAN_ENDPOINT, {
