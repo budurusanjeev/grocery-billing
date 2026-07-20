@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { loadItems, type Item } from '../lib/db';
-import { hasGeminiKey, parseGroceryPhoto } from '../lib/gemini';
+import { parseGroceryPhoto } from '../lib/gemini';
 import { matchItem } from '../lib/matcher';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
@@ -88,21 +88,6 @@ export default function ScanScreen() {
     else router.replace('/');
   };
 
-  if (!hasGeminiKey()) {
-    return (
-      <View style={[styles.screen, styles.center]}>
-        <Text style={styles.setupTitle}>One-time setup needed</Text>
-        <Text style={styles.setupText}>
-          Scanning uses the free Gemini API to read handwriting (English, Telugu, Urdu).{'\n\n'}
-          1. Go to aistudio.google.com and create a free API key (no card needed).{'\n'}
-          2. In the project folder, create a file named .env with this line:{'\n\n'}
-          EXPO_PUBLIC_GEMINI_KEY=your-key-here{'\n\n'}
-          3. Restart the app.
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.screen}>
       <View style={styles.pickRow}>
@@ -119,7 +104,10 @@ export default function ScanScreen() {
       {loading && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#166534" />
-          <Text style={styles.loadingText}>Reading the list…</Text>
+          <Text style={styles.loadingText}>
+            Reading the list… (the first scan of the day can take up to a minute while the server
+            wakes up)
+          </Text>
         </View>
       )}
 
@@ -181,8 +169,6 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc', padding: 12 },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
-  setupTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  setupText: { fontSize: 14, color: '#334155', lineHeight: 22 },
   pickRow: { flexDirection: 'row', gap: 8 },
   pickBtn: {
     flex: 1,
