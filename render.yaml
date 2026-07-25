@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: grocery-billing-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # Static web build of the Expo app (root directory, not `server`).
+  # EXPO_PUBLIC_SCAN_URL assumes the service above keeps the name
+  # "grocery-billing-server" — if Render suffixes it (name already taken),
+  # update this value to match the actual assigned URL after first deploy.
+  - type: web
+    name: grocery-billing-web
+    runtime: static
+    buildCommand: npm install && npx expo export -p web
+    staticPublishPath: ./dist
+    envVars:
+      - key: EXPO_PUBLIC_SCAN_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/scan

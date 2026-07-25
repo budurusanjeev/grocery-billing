@@ -5,17 +5,17 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, type Item } from '../lib/db';
 import { parseGroceryPhoto } from '../lib/gemini';
 import { matchItem } from '../lib/matcher';
-import { cardShadow, colors, radius, spacing } from '../lib/theme';
+import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
@@ -95,13 +95,21 @@ export default function ScanScreen() {
       <View style={styles.screen}>
         <View style={styles.pickRow}>
           {Platform.OS !== 'web' && (
-            <TouchableOpacity style={styles.pickBtn} onPress={() => pick(true)}>
+            <Pressable
+              style={({ pressed }) => [styles.pickBtn, pressed && pressedDim]}
+              android_ripple={ripple.onDark}
+              onPress={() => pick(true)}
+            >
               <Text style={styles.pickBtnText}>📷 Camera</Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
-          <TouchableOpacity style={styles.pickBtn} onPress={() => pick(false)}>
+          <Pressable
+            style={({ pressed }) => [styles.pickBtn, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={() => pick(false)}
+          >
             <Text style={styles.pickBtnText}>🖼 Choose Photo</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {!loading && rows.length === 0 && !error && (
@@ -135,8 +143,13 @@ export default function ScanScreen() {
               data={rows}
               keyExtractor={(_, i) => String(i)}
               renderItem={({ item: row, index }) => (
-                <TouchableOpacity
-                  style={[styles.row, !row.match && styles.rowUnmatched]}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.row,
+                    !row.match && styles.rowUnmatched,
+                    pressed && pressedDim,
+                  ]}
+                  android_ripple={ripple.onLight}
                   onPress={() =>
                     row.match &&
                     setRows((prev) =>
@@ -166,14 +179,18 @@ export default function ScanScreen() {
                       }
                     }}
                   />
-                </TouchableOpacity>
+                </Pressable>
               )}
             />
-            <TouchableOpacity style={styles.addBtn} onPress={addSelected}>
+            <Pressable
+              style={({ pressed }) => [styles.addBtn, pressed && pressedDim]}
+              android_ripple={ripple.onDark}
+              onPress={addSelected}
+            >
               <Text style={styles.addBtnText}>
                 ➕ Add {rows.filter((r) => r.checked && r.match).length} items to bill
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </>
         )}
       </View>
@@ -182,7 +199,13 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: spacing.listBottom,
+  },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
   pickRow: { flexDirection: 'row', gap: 8 },
   pickBtn: {
@@ -191,6 +214,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: 'center',
+    overflow: 'hidden',
     ...cardShadow,
   },
   pickBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
@@ -210,6 +234,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 7,
     gap: 8,
+    overflow: 'hidden',
     ...cardShadow,
   },
   rowUnmatched: { opacity: 0.7, backgroundColor: '#fef2f2' },
@@ -235,6 +260,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+    overflow: 'hidden',
     ...cardShadow,
   },
   addBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },

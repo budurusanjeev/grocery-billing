@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { addItem, loadItems, updateItem, type Item, type Unit } from '../lib/db';
-import { cardShadow, colors, radius, spacing } from '../lib/theme';
+import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { showMessage } from '../lib/ui';
 
 const UNITS: Unit[] = ['kg', 'packet', 'piece', 'litre', 'dozen'];
@@ -22,6 +22,12 @@ export default function CatalogScreen() {
   const [newNameTe, setNewNameTe] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newUnit, setNewUnit] = useState<Unit>('kg');
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editNameTe, setEditNameTe] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editUnit, setEditUnit] = useState<Unit>('kg');
 
   useEffect(() => {
     loadItems().then(setItems);
@@ -70,6 +76,33 @@ export default function CatalogScreen() {
     setNewPrice('');
   };
 
+  const startEdit = (item: Item) => {
+    setEditingId(item.id);
+    setEditName(item.name_en);
+    setEditNameTe(item.name_te);
+    setEditPrice(String(item.price));
+    setEditUnit(item.unit);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (item: Item) => {
+    const price = parseFloat(editPrice);
+    if (!editName.trim() || isNaN(price) || price < 0) {
+      showMessage('Missing details', 'Enter at least an item name and a valid price.');
+      return;
+    }
+    const next = await updateItem({
+      ...item,
+      name_en: editName.trim(),
+      name_te: editNameTe.trim(),
+      unit: editUnit,
+      price,
+    });
+    setItems(next);
+    setEditingId(null);
+  };
+
   return (
     <ScreenContainer>
       <View style={styles.screen}>
@@ -81,9 +114,13 @@ export default function CatalogScreen() {
           onChangeText={setQuery}
         />
 
-        <TouchableOpacity style={styles.addToggle} onPress={() => setShowAdd((s) => !s)}>
+        <Pressable
+          style={({ pressed }) => [styles.addToggle, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={() => setShowAdd((s) => !s)}
+        >
           <Text style={styles.addToggleText}>{showAdd ? '− Cancel' : '+ Add New Item'}</Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {showAdd && (
           <View style={styles.addForm}>
@@ -111,20 +148,29 @@ export default function CatalogScreen() {
                 onChangeText={setNewPrice}
               />
               {UNITS.map((u) => (
-                <TouchableOpacity
+                <Pressable
                   key={u}
-                  style={[styles.unitChip, newUnit === u && styles.unitChipActive]}
+                  style={({ pressed }) => [
+                    styles.unitChip,
+                    newUnit === u && styles.unitChipActive,
+                    pressed && pressedDim,
+                  ]}
+                  android_ripple={ripple.onLight}
                   onPress={() => setNewUnit(u)}
                 >
                   <Text style={[styles.unitChipText, newUnit === u && styles.unitChipTextActive]}>
                     {u}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
-            <TouchableOpacity style={styles.saveBtn} onPress={onAddItem}>
+            <Pressable
+              style={({ pressed }) => [styles.saveBtn, pressed && pressedDim]}
+              android_ripple={ripple.onDark}
+              onPress={onAddItem}
+            >
               <Text style={styles.saveBtnText}>Save Item</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
 
@@ -132,27 +178,95 @@ export default function CatalogScreen() {
           data={filtered}
           keyExtractor={(it) => it.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.itemRow}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>
-                  {item.name_en}
-                  {item.brand ? ` (${item.brand})` : ''}
-                </Text>
-                <Text style={styles.itemMeta}>
-                  {item.name_te} · per {item.unit}
-                </Text>
+          renderItem={({ item }) =>
+            editingId === item.id ? (
+              <View style={styles.editForm}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Item name (English)"
+                  placeholderTextColor={colors.textFaint}
+                  value={editName}
+                  onChangeText={setEditName}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Item name (Telugu, optional)"
+                  placeholderTextColor={colors.textFaint}
+                  value={editNameTe}
+                  onChangeText={setEditNameTe}
+                />
+                <View style={styles.row}>
+                  <TextInput
+                    style={[styles.input, styles.priceInput]}
+                    placeholder="Price ₹"
+                    placeholderTextColor={colors.textFaint}
+                    keyboardType="numeric"
+                    value={editPrice}
+                    onChangeText={setEditPrice}
+                  />
+                  {UNITS.map((u) => (
+                    <Pressable
+                      key={u}
+                      style={({ pressed }) => [
+                        styles.unitChip,
+                        editUnit === u && styles.unitChipActive,
+                        pressed && pressedDim,
+                      ]}
+                      android_ripple={ripple.onLight}
+                      onPress={() => setEditUnit(u)}
+                    >
+                      <Text style={[styles.unitChipText, editUnit === u && styles.unitChipTextActive]}>
+                        {u}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.row}>
+                  <Pressable
+                    style={({ pressed }) => [styles.saveBtn, styles.editBtnHalf, pressed && pressedDim]}
+                    android_ripple={ripple.onDark}
+                    onPress={() => saveEdit(item)}
+                  >
+                    <Text style={styles.saveBtnText}>Save</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.cancelBtn, styles.editBtnHalf, pressed && pressedDim]}
+                    android_ripple={ripple.onLight}
+                    onPress={cancelEdit}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Text style={styles.rupee}>₹</Text>
-              <TextInput
-                style={styles.priceEdit}
-                defaultValue={String(item.price)}
-                keyboardType="numeric"
-                onEndEditing={(e) => onPriceChange(item, e.nativeEvent.text)}
-                onBlur={() => {}}
-              />
-            </View>
-          )}
+            ) : (
+              <View style={styles.itemRow}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>
+                    {item.name_en}
+                    {item.brand ? ` (${item.brand})` : ''}
+                  </Text>
+                  <Text style={styles.itemMeta}>
+                    {item.name_te} · per {item.unit}
+                  </Text>
+                </View>
+                <Text style={styles.rupee}>₹</Text>
+                <TextInput
+                  style={styles.priceEdit}
+                  defaultValue={String(item.price)}
+                  keyboardType="numeric"
+                  onEndEditing={(e) => onPriceChange(item, e.nativeEvent.text)}
+                  onBlur={() => {}}
+                />
+                <Pressable
+                  style={({ pressed }) => [styles.editIconBtn, pressed && pressedDim]}
+                  android_ripple={ripple.onLight}
+                  onPress={() => startEdit(item)}
+                >
+                  <Text style={styles.editIcon}>✎</Text>
+                </Pressable>
+              </View>
+            )
+          }
         />
       </View>
     </ScreenContainer>
@@ -160,7 +274,13 @@ export default function CatalogScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: spacing.listBottom,
+  },
   listContent: { paddingBottom: spacing.listBottom },
   search: {
     backgroundColor: colors.card,
@@ -172,7 +292,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     ...cardShadow,
   },
-  addToggle: { paddingVertical: 10 },
+  addToggle: { paddingVertical: 10, borderRadius: radius.sm, overflow: 'hidden' },
   addToggleText: { color: colors.brand, fontWeight: '700', fontSize: 15 },
   addForm: {
     backgroundColor: colors.card,
@@ -182,6 +302,16 @@ const styles = StyleSheet.create({
     gap: 8,
     ...cardShadow,
   },
+  editForm: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: 12,
+    marginBottom: 7,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: colors.accentBlue,
+  },
+  editBtnHalf: { flex: 1 },
   input: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
@@ -198,6 +328,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    overflow: 'hidden',
   },
   unitChipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   unitChipText: { fontSize: 13, color: '#334155' },
@@ -207,8 +338,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingVertical: 12,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15 },
+  cancelBtn: {
+    backgroundColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  cancelBtnText: { color: colors.text, fontWeight: '700', fontSize: 15 },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -234,4 +374,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     backgroundColor: colors.bg,
   },
+  editIconBtn: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: radius.sm, overflow: 'hidden' },
+  editIcon: { fontSize: 17, color: colors.accentBlue },
 });

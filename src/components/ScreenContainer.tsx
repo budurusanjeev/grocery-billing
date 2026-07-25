@@ -23,7 +23,10 @@ const styles = StyleSheet.create({
   nativeScreen: { flex: 1, backgroundColor: colors.bg },
   webBackdrop: {
     flex: 1,
-    minHeight: '100vh' as any,
+    // No minHeight here — this sits below the nav header, so forcing a
+    // full 100vh on top of the header pushed the page taller than the
+    // viewport and shoved the bottom row past the fold. flex: 1 alone
+    // fills exactly the remaining space beneath the header.
     backgroundColor: colors.bg,
     alignItems: 'center',
     paddingVertical: 28,

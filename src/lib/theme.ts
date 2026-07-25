@@ -45,3 +45,12 @@ export const raisedShadow = {
 // to anchor the eye — cap content width and center it like a receipt.
 export const webMaxWidth = 520;
 export const isWeb = Platform.OS === 'web';
+export const isAndroid = Platform.OS === 'android';
+
+// android_ripple only renders on Android; on web/iOS Pressable falls back
+// to the `pressed` state, so buttons dim with opacity there instead.
+export const ripple = {
+  onLight: { color: 'rgba(15,23,42,0.12)' },
+  onDark: { color: 'rgba(255,255,255,0.3)' },
+};
+export const pressedDim = isAndroid ? undefined : { opacity: 0.7 };

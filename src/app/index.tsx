@@ -3,16 +3,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Linking,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, saveBill, type Item } from '../lib/db';
 import { searchItems } from '../lib/matcher';
-import { cardShadow, colors, radius, spacing } from '../lib/theme';
+import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { confirmDialog, formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
@@ -58,9 +58,10 @@ export default function BillingScreen() {
         {results.length > 0 && (
           <View style={styles.results}>
             {results.map((item) => (
-              <TouchableOpacity
+              <Pressable
                 key={item.id}
-                style={styles.resultRow}
+                style={({ pressed }) => [styles.resultRow, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
                 onPress={() => {
                   addLine(item);
                   setQuery('');
@@ -74,7 +75,7 @@ export default function BillingScreen() {
                 <Text style={styles.resultPrice}>
                   {formatMoney(item.price)}/{item.unit}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         )}
@@ -100,16 +101,28 @@ export default function BillingScreen() {
                   {l.qty} {l.unit} × {formatMoney(l.price)}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty - 1)}>
+              <Pressable
+                style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
+                onPress={() => updateQty(l.itemId, l.qty - 1)}
+              >
                 <Text style={styles.qtyBtnText}>−</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty + 1)}>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
+                onPress={() => updateQty(l.itemId, l.qty + 1)}
+              >
                 <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
+              </Pressable>
               <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
-              <TouchableOpacity onPress={() => removeLine(l.itemId)}>
+              <Pressable
+                style={({ pressed }) => [styles.removeBtn, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
+                onPress={() => removeLine(l.itemId)}
+              >
                 <Text style={styles.remove}>✕</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           )}
         />
@@ -120,34 +133,51 @@ export default function BillingScreen() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={[styles.action, styles.voice]} onPress={() => router.push('/voice')}>
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.voice, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={() => router.push('/voice')}
+          >
             <Text style={styles.actionIcon}>🎤</Text>
             <Text style={styles.actionText}>Voice</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.action, styles.scan]} onPress={() => router.push('/scan')}>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.scan, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={() => router.push('/scan')}
+          >
             <Text style={styles.actionIcon}>📷</Text>
             <Text style={styles.actionText}>Scan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.action, styles.catalog]} onPress={() => router.push('/catalog')}>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.catalog, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={() => router.push('/catalog')}
+          >
             <Text style={styles.actionIcon}>🏷</Text>
             <Text style={styles.actionText}>Prices</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.action, styles.newBill]}
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.newBill, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
             onPress={() =>
               lines.length > 0 && confirmDialog('New bill', 'Clear the current bill?', clear)
             }
           >
             <Text style={styles.actionIcon}>🗑</Text>
             <Text style={styles.actionText}>New Bill</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.action, styles.save]} onPress={onSaveBill}>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.action, styles.save, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={onSaveBill}
+          >
             <Text style={styles.actionIcon}>💾</Text>
             <Text style={styles.actionText}>Save Bill</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </ScreenContainer>
@@ -155,7 +185,13 @@ export default function BillingScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: spacing.listBottom,
+  },
   search: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -210,10 +246,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   qtyBtnText: { fontSize: 18, fontWeight: '700', color: colors.text },
   lineTotal: { fontSize: 15, fontWeight: '700', color: colors.brand, minWidth: 60, textAlign: 'right' },
-  remove: { color: colors.accentRed, fontSize: 16, paddingHorizontal: 6 },
+  removeBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  remove: { color: colors.accentRed, fontSize: 16 },
   totalBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -234,6 +277,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     gap: 3,
+    overflow: 'hidden',
     ...cardShadow,
   },
   voice: { backgroundColor: colors.accentPurple },
