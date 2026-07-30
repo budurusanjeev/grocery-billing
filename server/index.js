@@ -4,6 +4,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { requireShopkeeper } = require('./middleware/auth');
+const itemsRouter = require('./routes/items');
+const billsRouter = require('./routes/bills');
 
 const app = express();
 app.use(cors());
@@ -23,6 +26,9 @@ Rules:
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY) });
 });
+
+app.use('/api/v1/items', requireShopkeeper, itemsRouter);
+app.use('/api/v1/bills', requireShopkeeper, billsRouter);
 
 app.post('/api/v1/scan', async (req, res) => {
   const { image, mimeType } = req.body || {};

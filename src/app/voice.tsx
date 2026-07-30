@@ -153,61 +153,95 @@ export default function VoiceScreen() {
   return (
     <ScreenContainer>
       <View style={styles.screen}>
-        <View style={styles.langRow}>
-          {LANGUAGES.map((l) => (
-            <Pressable
-              key={l.code}
-              style={({ pressed }) => [
-                styles.langChip,
-                lang === l.code && styles.langChipActive,
-                pressed && pressedDim,
-              ]}
-              android_ripple={ripple.onLight}
-              onPress={() => !listening && setLang(l.code)}
-            >
-              <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>
-                {l.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.micBtn, listening && styles.micBtnActive, pressed && pressedDim]}
-          android_ripple={ripple.onDark}
-          onPress={toggleListening}
-        >
-          <Text style={styles.micIcon}>🎤</Text>
-          <Text style={styles.micLabel}>
-            {listening ? 'Listening… say the next item, or tap to stop' : 'Tap to speak'}
-          </Text>
-        </Pressable>
-
-        {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
-
-        {justAdded && (
-          <View style={styles.addedToast}>
-            <Text style={styles.addedToastText}>✓ Added {justAdded}</Text>
-          </View>
-        )}
-
-        <Text style={styles.hint}>
-          Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
-        </Text>
-
-        {unmatched.length > 0 && (
-          <View style={styles.unmatchedBox}>
-            <Text style={styles.unmatchedTitle}>Not understood:</Text>
-            <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
-          </View>
-        )}
-
+        {/* Everything (controls + spoken items + total + done) lives inside
+            ONE FlatList via header/footer components, so the whole screen
+            scrolls as a unit. Previously the controls above the list (mic
+            button, hint, "Not understood" box) were fixed outside any
+            scroll view — a long "Not understood" list could push the total
+            bar and Done button off-screen with no way to reach them. */}
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
           data={lines}
           keyExtractor={(l) => l.itemId}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.langRow}>
+                {LANGUAGES.map((l) => (
+                  <Pressable
+                    key={l.code}
+                    style={({ pressed }) => [
+                      styles.langChip,
+                      lang === l.code && styles.langChipActive,
+                      pressed && pressedDim,
+                    ]}
+                    android_ripple={ripple.onLight}
+                    onPress={() => !listening && setLang(l.code)}
+                  >
+                    <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>
+                      {l.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.micBtn,
+                  listening && styles.micBtnActive,
+                  pressed && pressedDim,
+                ]}
+                android_ripple={ripple.onDark}
+                onPress={toggleListening}
+              >
+                <Text style={styles.micIcon}>🎤</Text>
+                <Text style={styles.micLabel}>
+                  {listening ? 'Listening… say the next item, or tap to stop' : 'Tap to speak'}
+                </Text>
+              </Pressable>
+
+              {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
+
+              {justAdded && (
+                <View style={styles.addedToast}>
+                  <Text style={styles.addedToastText}>✓ Added {justAdded}</Text>
+                </View>
+              )}
+
+              <Text style={styles.hint}>
+                Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
+              </Text>
+
+              {unmatched.length > 0 && (
+                <View style={styles.unmatchedBox}>
+                  <Text style={styles.unmatchedTitle}>Not understood:</Text>
+                  <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
+                </View>
+              )}
+            </View>
+          }
           ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
+          ListFooterComponent={
+            <View>
+              <View style={styles.totalBar}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [styles.doneBtn, pressed && pressedDim]}
+                android_ripple={ripple.onDark}
+                onPress={() => {
+                  // After a browser refresh there is no history, so "back" has
+                  // nowhere to go — fall back to the billing screen directly.
+                  if (router.canGoBack()) router.back();
+                  else router.replace('/');
+                }}
+              >
+                <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
+              </Pressable>
+            </View>
+          }
           renderItem={({ item: l }) => (
             <View style={styles.lineRow}>
               <View style={styles.lineInfo}>
@@ -241,24 +275,6 @@ export default function VoiceScreen() {
             </View>
           )}
         />
-
-        <View style={styles.totalBar}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatMoney(total)}</Text>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.doneBtn, pressed && pressedDim]}
-          android_ripple={ripple.onDark}
-          onPress={() => {
-            // After a browser refresh there is no history, so "back" has
-            // nowhere to go — fall back to the billing screen directly.
-            if (router.canGoBack()) router.back();
-            else router.replace('/');
-          }}
-        >
-          <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
-        </Pressable>
       </View>
     </ScreenContainer>
   );
@@ -330,8 +346,8 @@ const styles = StyleSheet.create({
   },
   unmatchedTitle: { color: '#b91c1c', fontWeight: '700', fontSize: 13 },
   unmatchedText: { color: '#b91c1c', fontSize: 13 },
-  list: { flex: 1, marginTop: 10 },
-  listContent: { paddingBottom: spacing.listBottom },
+  list: { flex: 1 },
+  listContent: { paddingBottom: spacing.listBottom, flexGrow: 1 },
   empty: { textAlign: 'center', color: colors.textFaint, marginTop: 30, fontSize: 14 },
   lineRow: {
     flexDirection: 'row',
@@ -339,6 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: radius.md,
     padding: 10,
+    marginTop: 10,
     marginBottom: 7,
     gap: 8,
     ...cardShadow,
@@ -367,7 +384,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    marginTop: 6,
+    marginTop: 10,
     ...cardShadow,
   },
   totalLabel: { color: colors.brandLight, fontSize: 16, fontWeight: '600' },

@@ -9,6 +9,10 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
 
   # Static web build of the Expo app (root directory, not `server`).
   # EXPO_PUBLIC_SCAN_URL assumes the service above keeps the name
@@ -22,3 +26,15 @@ services:
     envVars:
       - key: EXPO_PUBLIC_SCAN_URL
         value: https://grocery-billing-server.onrender.com/api/v1/scan
+      - key: EXPO_PUBLIC_ITEMS_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/items
+      - key: EXPO_PUBLIC_BILLS_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/bills
+      # Known values inlined directly (anon key isn't secret, unlike
+      # SUPABASE_SERVICE_ROLE_KEY above which stays sync:false).
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        value: https://flqwurfvryzifwfuyybm.supabase.co
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9
+      - key: EXPO_PUBLIC_RESET_PIN_URL
+        value: grocerybilling://reset-pin

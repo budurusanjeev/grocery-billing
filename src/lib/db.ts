@@ -22,15 +22,28 @@ export interface BillLine {
   qty: number;
 }
 
+export type PaymentMethod = 'cash' | 'upi' | 'card';
+
 export interface Bill {
   id: string;
   created_at: string;
   lines: BillLine[];
   total: number;
+  paymentMethod?: PaymentMethod;
+}
+
+export interface QrCode {
+  id: string;
+  label: string;
+  // A data URI (data:image/jpeg;base64,...) so it works identically on web
+  // and native without depending on a cache file surviving app restarts.
+  imageUri: string;
 }
 
 const ITEMS_KEY = 'gb_items_v1';
 const BILLS_KEY = 'gb_bills_v1';
+const QRCODES_KEY = 'gb_qrcodes_v1';
+export const MAX_QRCODES = 10;
 
 // AsyncStorage is used instead of sqlite so the exact same code runs on
 // Android and web (localStorage) with zero extra config. The catalog is
@@ -69,12 +82,17 @@ export async function addItem(item: Item): Promise<Item[]> {
   return next;
 }
 
-export async function saveBill(lines: BillLine[], total: number): Promise<Bill> {
+export async function saveBill(
+  lines: BillLine[],
+  total: number,
+  paymentMethod?: PaymentMethod,
+): Promise<Bill> {
   const bill: Bill = {
     id: `${Date.now()}`,
     created_at: new Date().toISOString(),
     lines,
     total,
+    paymentMethod,
   };
   const raw = await AsyncStorage.getItem(BILLS_KEY);
   const bills: Bill[] = raw ? JSON.parse(raw) : [];
@@ -87,4 +105,26 @@ export async function saveBill(lines: BillLine[], total: number): Promise<Bill> 
 export async function getBills(): Promise<Bill[]> {
   const raw = await AsyncStorage.getItem(BILLS_KEY);
   return raw ? JSON.parse(raw) : [];
+}
+
+export async function loadQrCodes(): Promise<QrCode[]> {
+  const raw = await AsyncStorage.getItem(QRCODES_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function addQrCode(qr: Omit<QrCode, 'id'>): Promise<QrCode[]> {
+  const existing = await loadQrCodes();
+  if (existing.length >= MAX_QRCODES) {
+    throw new Error(`You can save up to ${MAX_QRCODES} QR codes.`);
+  }
+  const next = [...existing, { ...qr, id: `qr-${Date.now()}` }];
+  await AsyncStorage.setItem(QRCODES_KEY, JSON.stringify(next));
+  return next;
+}
+
+export async function removeQrCode(id: string): Promise<QrCode[]> {
+  const existing = await loadQrCodes();
+  const next = existing.filter((q) => q.id !== id);
+  await AsyncStorage.setItem(QRCODES_KEY, JSON.stringify(next));
+  return next;
 }
