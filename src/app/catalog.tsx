@@ -28,6 +28,7 @@ export default function CatalogScreen() {
   const [newCategory, setNewCategory] = useState('Custom');
   const [newPrice, setNewPrice] = useState('');
   const [newUnit, setNewUnit] = useState<Unit>('kg');
+  const [newNoDiscount, setNewNoDiscount] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -36,6 +37,7 @@ export default function CatalogScreen() {
   const [editCategory, setEditCategory] = useState('Custom');
   const [editPrice, setEditPrice] = useState('');
   const [editUnit, setEditUnit] = useState<Unit>('kg');
+  const [editNoDiscount, setEditNoDiscount] = useState(false);
 
   useEffect(() => {
     loadItems().then(setItems);
@@ -195,6 +197,7 @@ export default function CatalogScreen() {
       brand: newBrand.trim() || null,
       unit: newUnit,
       price,
+      noDiscount: newNoDiscount,
     });
     setItems(next);
     setShowAdd(false);
@@ -203,6 +206,7 @@ export default function CatalogScreen() {
     setNewBrand('');
     setNewCategory('Custom');
     setNewPrice('');
+    setNewNoDiscount(false);
   };
 
   const onFetchNewItems = async () => {
@@ -226,6 +230,7 @@ export default function CatalogScreen() {
     setEditCategory(item.category);
     setEditPrice(String(item.price));
     setEditUnit(item.unit);
+    setEditNoDiscount(!!item.noDiscount);
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -244,6 +249,7 @@ export default function CatalogScreen() {
       category: editCategory,
       unit: editUnit,
       price,
+      noDiscount: editNoDiscount,
     });
     setItems(next);
     setEditingId(null);
@@ -346,6 +352,19 @@ export default function CatalogScreen() {
                 </Pressable>
               ))}
             </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.noDiscountToggle,
+                newNoDiscount && styles.noDiscountToggleActive,
+                pressed && pressedDim,
+              ]}
+              android_ripple={ripple.onLight}
+              onPress={() => setNewNoDiscount((v) => !v)}
+            >
+              <Text style={styles.noDiscountToggleText}>
+                {newNoDiscount ? '☑' : '☐'} No customer discount on this item
+              </Text>
+            </Pressable>
             <Pressable
               style={({ pressed }) => [styles.saveBtn, pressed && pressedDim]}
               android_ripple={ripple.onDark}
@@ -472,6 +491,19 @@ export default function CatalogScreen() {
                     </Pressable>
                   ))}
                 </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.noDiscountToggle,
+                    editNoDiscount && styles.noDiscountToggleActive,
+                    pressed && pressedDim,
+                  ]}
+                  android_ripple={ripple.onLight}
+                  onPress={() => setEditNoDiscount((v) => !v)}
+                >
+                  <Text style={styles.noDiscountToggleText}>
+                    {editNoDiscount ? '☑' : '☐'} No customer discount on this item
+                  </Text>
+                </Pressable>
                 <View style={styles.row}>
                   <Pressable
                     style={({ pressed }) => [styles.saveBtn, styles.editBtnHalf, pressed && pressedDim]}
@@ -495,6 +527,7 @@ export default function CatalogScreen() {
                   <Text style={styles.itemName}>
                     {item.name_en}
                     {item.brand ? ` (${item.brand})` : ''}
+                    {item.noDiscount ? ' 🚫' : ''}
                   </Text>
                   <Text style={styles.itemMeta}>
                     {item.name_te} · per {item.unit}
@@ -618,6 +651,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     overflow: 'hidden',
   },
+  noDiscountToggle: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
+  },
+  noDiscountToggleActive: { backgroundColor: colors.brandLight, borderColor: colors.brand },
+  noDiscountToggleText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   saveBtn: {
     backgroundColor: '#16a34a',
     borderRadius: radius.sm,

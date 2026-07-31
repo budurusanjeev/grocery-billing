@@ -12,6 +12,11 @@ export interface Item {
   brand: string | null;
   unit: Unit;
   price: number;
+  // Some low-margin staples stay excluded from customer-type discounts even
+  // for retailer/wholesaler bills — set on the catalog item so it applies
+  // automatically every time it's billed, without the shopkeeper having to
+  // remember it per sale.
+  noDiscount?: boolean;
 }
 
 export interface BillLine {
@@ -20,9 +25,26 @@ export interface BillLine {
   unit: Unit;
   price: number;
   qty: number;
+  // Copied from the item at the moment it's added to the bill, so a bill
+  // already in progress isn't affected by a later catalog edit.
+  noDiscount?: boolean;
 }
 
 export type PaymentMethod = 'cash' | 'upi' | 'card';
+
+export type CustomerType = 'regular' | 'retailer' | 'wholesaler';
+
+// Single source of truth for the discount tiers — used to render the
+// selector chips and to compute the discount amount for a bill.
+export const CUSTOMER_TYPES: { key: CustomerType; label: string; discountPercent: number }[] = [
+  { key: 'regular', label: 'Regular', discountPercent: 0 },
+  { key: 'retailer', label: 'Retailer', discountPercent: 5 },
+  { key: 'wholesaler', label: 'Wholesaler', discountPercent: 10 },
+];
+
+export function discountPercentFor(customerType: CustomerType): number {
+  return CUSTOMER_TYPES.find((c) => c.key === customerType)?.discountPercent ?? 0;
+}
 
 export interface Bill {
   id: string;
@@ -30,6 +52,10 @@ export interface Bill {
   lines: BillLine[];
   total: number;
   paymentMethod?: PaymentMethod;
+  customerType?: CustomerType;
+  // Rupee amount knocked off the subtotal (0 if none) — stored so history
+  // and receipts can show the breakdown without recomputing it later.
+  discount?: number;
 }
 
 export interface QrCode {
@@ -86,6 +112,8 @@ export async function saveBill(
   lines: BillLine[],
   total: number,
   paymentMethod?: PaymentMethod,
+  customerType?: CustomerType,
+  discount?: number,
 ): Promise<Bill> {
   const bill: Bill = {
     id: `${Date.now()}`,
@@ -93,6 +121,8 @@ export async function saveBill(
     lines,
     total,
     paymentMethod,
+    customerType,
+    discount,
   };
   const raw = await AsyncStorage.getItem(BILLS_KEY);
   const bills: Bill[] = raw ? JSON.parse(raw) : [];

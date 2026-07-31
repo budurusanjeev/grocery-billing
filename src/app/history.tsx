@@ -7,6 +7,7 @@ import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/
 import { formatMoney, showMessage } from '../lib/ui';
 
 const PAYMENT_ICON: Record<string, string> = { cash: '💵', upi: '📱', card: '💳' };
+const CUSTOMER_LABEL: Record<string, string> = { regular: 'Regular', retailer: 'Retailer', wholesaler: 'Wholesaler' };
 
 function isToday(isoDate: string): boolean {
   const d = new Date(isoDate);
@@ -69,6 +70,9 @@ export default function HistoryScreen() {
       ...bill.lines.map(
         (l) => `${l.name} — ${l.qty} ${l.unit} × ${formatMoney(l.price)} = ${formatMoney(l.price * l.qty)}`,
       ),
+      ...(bill.discount
+        ? [`Discount (${CUSTOMER_LABEL[bill.customerType ?? 'regular']}): −${formatMoney(bill.discount)}`]
+        : []),
       `Total: ${formatMoney(bill.total)}`,
     ].join('\n');
     Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
@@ -144,6 +148,9 @@ export default function HistoryScreen() {
                     <Text style={styles.billMeta}>
                       {bill.lines.length} items
                       {bill.paymentMethod ? ` · ${PAYMENT_ICON[bill.paymentMethod] ?? ''} ${bill.paymentMethod.toUpperCase()}` : ''}
+                      {bill.customerType && bill.customerType !== 'regular'
+                        ? ` · ${CUSTOMER_LABEL[bill.customerType]}`
+                        : ''}
                     </Text>
                   </View>
                   <Text style={styles.billTotal}>{formatMoney(bill.total)}</Text>
@@ -158,6 +165,14 @@ export default function HistoryScreen() {
                         <Text style={styles.billLineAmount}>{formatMoney(l.price * l.qty)}</Text>
                       </View>
                     ))}
+                    {!!bill.discount && (
+                      <View style={styles.billLine}>
+                        <Text style={styles.billLineName}>
+                          Discount ({CUSTOMER_LABEL[bill.customerType ?? 'regular']})
+                        </Text>
+                        <Text style={styles.billLineAmount}>−{formatMoney(bill.discount)}</Text>
+                      </View>
+                    )}
                     <Pressable
                       style={({ pressed }) => [styles.billShareBtn, pressed && pressedDim]}
                       android_ripple={ripple.onDark}

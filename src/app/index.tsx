@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { iconFor } from '../lib/categories';
-import { loadItems, type Item } from '../lib/db';
+import { CUSTOMER_TYPES, loadItems, type Item } from '../lib/db';
 import { searchItems } from '../lib/matcher';
 import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple } from '../lib/theme';
 import { confirmDialog, formatMoney, showMessage } from '../lib/ui';
@@ -21,7 +21,8 @@ import { useBill } from '../state/bill';
 // panels spanning the full width, not two columns squeezed inside one card.
 export default function BillingScreen() {
   const router = useRouter();
-  const { lines, total, addLine, updateQty, removeLine, clear } = useBill();
+  const { lines, customerType, setCustomerType, subtotal, discountRate, discount, total, addLine, updateQty, removeLine, clear } =
+    useBill();
   const [items, setItems] = useState<Item[]>([]);
   const [query, setQuery] = useState('');
 
@@ -81,6 +82,28 @@ export default function BillingScreen() {
         </View>
       )}
     </>
+  );
+
+  const customerTypeRow = (
+    <View style={styles.customerTypeRow}>
+      {CUSTOMER_TYPES.map((c) => (
+        <Pressable
+          key={c.key}
+          style={({ pressed }) => [
+            styles.customerChip,
+            customerType === c.key && styles.customerChipActive,
+            pressed && pressedDim,
+          ]}
+          android_ripple={ripple.onLight}
+          onPress={() => setCustomerType(c.key)}
+        >
+          <Text style={[styles.customerChipText, customerType === c.key && styles.customerChipTextActive]}>
+            {c.label}
+            {c.discountPercent > 0 ? ` (${c.discountPercent}% off)` : ''}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
   );
 
   const billListEl = (
@@ -180,9 +203,18 @@ export default function BillingScreen() {
           {billListEl}
         </View>
 
+        {customerTypeRow}
+
         <View style={styles.totalPayRow}>
           <View style={styles.totalBarMobile}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <View>
+              <Text style={styles.totalLabel}>Total</Text>
+              {discount > 0 && (
+                <Text style={styles.discountHint}>
+                  {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+                </Text>
+              )}
+            </View>
             <Text style={styles.totalValue}>{formatMoney(total)}</Text>
           </View>
           <Pressable
@@ -203,9 +235,17 @@ export default function BillingScreen() {
       <View style={styles.itemsPanel}>
         {searchAndResults}
         {billListEl}
+        {customerTypeRow}
 
         <View style={styles.totalBar}>
-          <Text style={styles.totalLabel}>Total</Text>
+          <View>
+            <Text style={styles.totalLabel}>Total</Text>
+            {discount > 0 && (
+              <Text style={styles.discountHint}>
+                {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+              </Text>
+            )}
+          </View>
           <Text style={styles.totalValue}>{formatMoney(total)}</Text>
         </View>
       </View>
@@ -412,4 +452,18 @@ const styles = StyleSheet.create({
   },
   totalLabel: { color: colors.brandLight, fontSize: 16, fontWeight: '600' },
   totalValue: { color: '#ffffff', fontSize: 26, fontWeight: '800' },
+  discountHint: { color: colors.brandLight, fontSize: 11, marginTop: 2 },
+  customerTypeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  customerChip: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  customerChipActive: { backgroundColor: colors.brandLight, borderColor: colors.brand },
+  customerChipText: { fontSize: 12.5, fontWeight: '700', color: colors.textMuted },
+  customerChipTextActive: { color: colors.brandDark },
 });

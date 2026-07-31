@@ -15,7 +15,7 @@ const METHODS: { key: PaymentMethod; label: string; icon: string }[] = [
 
 export default function PayScreen() {
   const router = useRouter();
-  const { lines, total, clear } = useBill();
+  const { lines, customerType, subtotal, discountRate, discount, total, clear } = useBill();
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [qrCodes, setQrCodes] = useState<QrCode[]>([]);
   const [selectedQr, setSelectedQr] = useState<QrCode | null>(null);
@@ -45,13 +45,19 @@ export default function PayScreen() {
     }
     setSaving(true);
     try {
-      await saveBill(lines, total, method);
+      await saveBill(lines, total, method, customerType, discount);
       const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
       const text = [
         'Kirana Bill',
         ...lines.map(
           (l) => `${l.name} — ${l.qty} ${l.unit} × ${formatMoney(l.price)} = ${formatMoney(l.price * l.qty)}`,
         ),
+        ...(discount > 0
+          ? [
+              `Subtotal: ${formatMoney(subtotal)}`,
+              `Discount (${customerType}, ${discountRate}%): −${formatMoney(discount)}`,
+            ]
+          : []),
         `Total: ${formatMoney(total)}`,
         `Paid via: ${methodLabel}`,
       ].join('\n');
@@ -111,7 +117,14 @@ export default function PayScreen() {
             the footer (Cancel/Confirm) off-screen with no way to reach them. */}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.totalBar}>
-          <Text style={styles.totalLabel}>Amount Due</Text>
+          <View>
+            <Text style={styles.totalLabel}>Amount Due</Text>
+            {discount > 0 && (
+              <Text style={styles.discountHint}>
+                {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+              </Text>
+            )}
+          </View>
           <Text style={styles.totalValue}>{formatMoney(total)}</Text>
         </View>
 
@@ -261,6 +274,7 @@ const styles = StyleSheet.create({
   },
   totalLabel: { color: colors.brandLight, fontSize: 15, fontWeight: '600' },
   totalValue: { color: '#ffffff', fontSize: 30, fontWeight: '800' },
+  discountHint: { color: colors.brandLight, fontSize: 12, marginTop: 2 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginTop: 16, marginBottom: 8 },
   methodRow: { flexDirection: 'row', gap: 8 },
   methodChip: {

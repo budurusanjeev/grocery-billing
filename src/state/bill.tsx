@@ -1,8 +1,13 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { BillLine, Item } from '../lib/db';
+import { discountPercentFor, type BillLine, type CustomerType, type Item } from '../lib/db';
 
 interface BillContextValue {
   lines: BillLine[];
+  customerType: CustomerType;
+  setCustomerType: (type: CustomerType) => void;
+  subtotal: number;
+  discountRate: number;
+  discount: number;
   total: number;
   addLine: (item: Item, qty?: number) => void;
   updateQty: (itemId: string, qty: number) => void;
@@ -14,6 +19,7 @@ const BillContext = createContext<BillContextValue | null>(null);
 
 export function BillProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<BillLine[]>([]);
+  const [customerType, setCustomerType] = useState<CustomerType>('regular');
 
   const addLine = useCallback((item: Item, qty = 1) => {
     setLines((prev) => {
@@ -25,7 +31,14 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
       }
       return [
         ...prev,
-        { itemId: item.id, name: item.name_en, unit: item.unit, price: item.price, qty: round3(qty) },
+        {
+          itemId: item.id,
+          name: item.name_en,
+          unit: item.unit,
+          price: item.price,
+          qty: round3(qty),
+          noDiscount: item.noDiscount,
+        },
       ];
     });
   }, []);
@@ -44,14 +57,35 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
 
   const clear = useCallback(() => setLines([]), []);
 
-  const total = useMemo(
-    () => Math.round(lines.reduce((sum, l) => sum + l.price * l.qty, 0) * 100) / 100,
-    [lines],
-  );
+  const subtotal = useMemo(() => round2(lines.reduce((sum, l) => sum + l.price * l.qty, 0)), [lines]);
+
+  const discountRate = discountPercentFor(customerType);
+
+  const discount = useMemo(() => {
+    if (discountRate === 0) return 0;
+    const discountable = lines
+      .filter((l) => !l.noDiscount)
+      .reduce((sum, l) => sum + l.price * l.qty, 0);
+    return round2(discountable * (discountRate / 100));
+  }, [lines, discountRate]);
+
+  const total = useMemo(() => round2(subtotal - discount), [subtotal, discount]);
 
   const value = useMemo(
-    () => ({ lines, total, addLine, updateQty, removeLine, clear }),
-    [lines, total, addLine, updateQty, removeLine, clear],
+    () => ({
+      lines,
+      customerType,
+      setCustomerType,
+      subtotal,
+      discountRate,
+      discount,
+      total,
+      addLine,
+      updateQty,
+      removeLine,
+      clear,
+    }),
+    [lines, customerType, subtotal, discountRate, discount, total, addLine, updateQty, removeLine, clear],
   );
 
   return <BillContext.Provider value={value}>{children}</BillContext.Provider>;
@@ -59,6 +93,10 @@ export function BillProvider({ children }: { children: React.ReactNode }) {
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 export function useBill(): BillContextValue {
