@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { loadQrCodes, saveBill, type PaymentMethod, type QrCode } from '../lib/db';
 import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple } from '../lib/theme';
@@ -21,6 +21,7 @@ export default function PayScreen() {
   const [selectedQr, setSelectedQr] = useState<QrCode | null>(null);
   const [saving, setSaving] = useState(false);
   const [paidText, setPaidText] = useState<string | null>(null);
+  const [showFullQr, setShowFullQr] = useState(false);
   // total comes live from useBill() and recalculates to 0 the instant
   // clear() runs — capture the amount that was actually paid before
   // clearing, so the success screen doesn't show ₹0.
@@ -174,7 +175,7 @@ export default function PayScreen() {
       ) : selectedQr ? (
         isWeb ? (
           <View style={styles.qrConfirm}>
-            <Text style={styles.qrConfirmText}>✓ “{selectedQr.label}” is showing on the left for the customer to scan</Text>
+            <Text style={styles.qrConfirmText}>✓ “{selectedQr.label}” is showing on the right for the customer to scan</Text>
             <Pressable
               style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
               android_ripple={ripple.onLight}
@@ -186,7 +187,10 @@ export default function PayScreen() {
         ) : (
           <View style={styles.qrDisplay}>
             <Text style={styles.qrDisplayLabel}>{selectedQr.label}</Text>
-            <Image source={{ uri: selectedQr.imageUri }} style={styles.qrImage} resizeMode="contain" />
+            <Pressable onPress={() => setShowFullQr(true)}>
+              <Image source={{ uri: selectedQr.imageUri }} style={styles.qrImage} resizeMode="contain" />
+            </Pressable>
+            <Text style={styles.tapToEnlargeHint}>Tap the QR code to show it full screen</Text>
             <Pressable
               style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
               android_ripple={ripple.onLight}
@@ -240,12 +244,21 @@ export default function PayScreen() {
   );
 
   if (isWeb) {
-    // Two panels: the left one is meant to face the customer, showing the
-    // selected QR code full-size so they can scan it directly off the
-    // screen; the shopkeeper operates the right panel exactly as before
-    // (method selection, QR picker, Cancel/Confirm).
+    // Two panels: the shopkeeper operates the left panel as usual (method
+    // selection, QR picker, Cancel/Confirm); the right panel faces the
+    // customer, showing the selected QR code full-size so they can scan it
+    // directly off the screen.
     return (
       <View style={styles.page}>
+        <View style={styles.controlsPanel}>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            {totalBarEl}
+            {methodRowEl}
+            {qrSectionEl}
+          </ScrollView>
+          {footerEl}
+        </View>
+
         <View style={styles.qrPanel}>
           {method === 'upi' && selectedQr ? (
             <>
@@ -258,20 +271,11 @@ export default function PayScreen() {
               <Text style={styles.qrPanelEmptyIcon}>📱</Text>
               <Text style={styles.qrPanelEmptyText}>
                 {method === 'upi'
-                  ? 'Pick a QR code on the right — it will appear here full-size for the customer to scan.'
+                  ? 'Pick a QR code on the left — it will appear here full-size for the customer to scan.'
                   : 'Select UPI as the payment method to show a scannable QR code here.'}
               </Text>
             </View>
           )}
-        </View>
-
-        <View style={styles.controlsPanel}>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-            {totalBarEl}
-            {methodRowEl}
-            {qrSectionEl}
-          </ScrollView>
-          {footerEl}
         </View>
       </View>
     );
@@ -291,6 +295,19 @@ export default function PayScreen() {
         </ScrollView>
         {footerEl}
       </View>
+
+      {/* Full-screen, opaque white background — no dimmed/blurred overlay —
+          so the QR code stays crisp and bright enough for the customer's
+          phone camera to scan easily. */}
+      {selectedQr && (
+        <Modal visible={showFullQr} animationType="fade" onRequestClose={() => setShowFullQr(false)}>
+          <Pressable style={styles.fullQrScreen} onPress={() => setShowFullQr(false)}>
+            <Text style={styles.fullQrLabel}>{selectedQr.label}</Text>
+            <Image source={{ uri: selectedQr.imageUri }} style={styles.fullQrImage} resizeMode="contain" />
+            <Text style={styles.fullQrHint}>Tap anywhere to close</Text>
+          </Pressable>
+        </Modal>
+      )}
     </ScreenContainer>
   );
 }
@@ -435,8 +452,21 @@ const styles = StyleSheet.create({
   qrDisplay: { alignItems: 'center', backgroundColor: colors.card, borderRadius: radius.lg, padding: 16, ...cardShadow },
   qrDisplayLabel: { fontSize: 16, fontWeight: '800', color: colors.brandDark, marginBottom: 10 },
   qrImage: { width: '100%', height: 260 },
+  tapToEnlargeHint: { marginTop: 8, fontSize: 12, color: colors.textMuted },
   changeQrBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm, overflow: 'hidden' },
   changeQrBtnText: { color: colors.brand, fontSize: 13, fontWeight: '600' },
+  // Plain opaque white, no dim/blur overlay — the whole point is a crisp,
+  // bright, easy-to-scan QR code filling the screen.
+  fullQrScreen: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  fullQrLabel: { fontSize: 20, fontWeight: '800', color: colors.brandDark, marginBottom: 20 },
+  fullQrImage: { width: '100%', height: '70%' },
+  fullQrHint: { marginTop: 24, fontSize: 14, color: colors.textMuted },
   footer: { flexDirection: 'row', gap: 8, paddingTop: 16 },
   cancelBtn: {
     flex: 1,
