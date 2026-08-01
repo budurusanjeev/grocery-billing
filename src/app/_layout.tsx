@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import AuthGate from '../components/AuthGate';
 import Header from '../components/Header';
+import HeaderBackButton from '../components/HeaderBackButton';
 import { colors } from '../lib/theme';
 import { AuthProvider } from '../state/auth';
 import { BillProvider } from '../state/bill';
@@ -37,7 +38,10 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="history"
-              options={{ headerTitle: () => <Header icon="📊" title="Today's Bills" subtitle="Day summary" /> }}
+              options={{
+                headerTitle: () => <Header icon="📊" title="Today's Bills" subtitle="Day summary" />,
+                headerLeft: () => <HeaderBackButton />,
+              }}
             />
             <Stack.Screen
               name="pay"

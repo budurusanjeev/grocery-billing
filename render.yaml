@@ -30,6 +30,8 @@ services:
         value: https://grocery-billing-server.onrender.com/api/v1/items
       - key: EXPO_PUBLIC_BILLS_URL
         value: https://grocery-billing-server.onrender.com/api/v1/bills
+      - key: EXPO_PUBLIC_QRCODES_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/qrcodes
       # Known values inlined directly (anon key isn't secret, unlike
       # SUPABASE_SERVICE_ROLE_KEY above which stays sync:false).
       - key: EXPO_PUBLIC_SUPABASE_URL

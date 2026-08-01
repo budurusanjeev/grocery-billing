@@ -83,3 +83,21 @@ alter table public.bills enable row level security;
 create policy "bills_select_own" on public.bills for select using (auth.uid() = shopkeeper_id);
 create policy "bills_insert_own" on public.bills for insert with check (auth.uid() = shopkeeper_id);
 create policy "bills_update_own" on public.bills for update using (auth.uid() = shopkeeper_id) with check (auth.uid() = shopkeeper_id);
+
+-- Saved UPI QR codes (Payment QR Codes screen). `id text` for the same
+-- reason as bills: the client's own local id is reused as the primary key,
+-- so re-syncing is an idempotent upsert instead of creating duplicates.
+-- image_uri holds the full data: URI (base64) -- same shape as it's stored
+-- on-device in AsyncStorage, so no conversion is needed on either end.
+create table public.qr_codes (
+  id text primary key,
+  shopkeeper_id uuid not null references public.profiles(id) on delete cascade,
+  label text not null,
+  image_uri text not null,
+  created_at timestamptz not null default now()
+);
+create index qr_codes_shopkeeper_id_idx on public.qr_codes(shopkeeper_id);
+alter table public.qr_codes enable row level security;
+create policy "qr_codes_select_own" on public.qr_codes for select using (auth.uid() = shopkeeper_id);
+create policy "qr_codes_insert_own" on public.qr_codes for insert with check (auth.uid() = shopkeeper_id);
+create policy "qr_codes_delete_own" on public.qr_codes for delete using (auth.uid() = shopkeeper_id);

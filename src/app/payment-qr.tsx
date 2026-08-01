@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { addQrCode, loadQrCodes, MAX_QRCODES, removeQrCode, type QrCode } from '../lib/db';
+import { deleteQrCodeRemote, syncQrCodes } from '../lib/sync';
 import { cardShadow, colors, pressedDim, radius, ripple } from '../lib/theme';
 import { confirmDialog, showMessage } from '../lib/ui';
 
@@ -19,10 +20,29 @@ export default function PaymentQrScreen() {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadQrCodes().then(setQrCodes);
   }, []);
+
+  const onSync = async () => {
+    setSyncing(true);
+    try {
+      const { added, items } = await syncQrCodes();
+      setQrCodes(items);
+      showMessage(
+        'Sync complete',
+        added > 0
+          ? `Pulled ${added} QR code(s) saved on another device.`
+          : 'Everything is already up to date.',
+      );
+    } catch (e: any) {
+      showMessage('Sync failed', e?.message ?? 'Could not reach the server.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const pick = async (useCamera: boolean) => {
     if (qrCodes.length >= MAX_QRCODES) {
@@ -66,6 +86,7 @@ export default function PaymentQrScreen() {
     confirmDialog('Remove QR code', `Remove "${qr.label}"?`, async () => {
       const next = await removeQrCode(qr.id);
       setQrCodes(next);
+      deleteQrCodeRemote(qr.id);
     });
   };
 
@@ -76,6 +97,17 @@ export default function PaymentQrScreen() {
           Save up to {MAX_QRCODES} UPI QR codes (GPay, PhonePe, bank, etc.) so you can quickly show
           the right one at checkout. ({qrCodes.length}/{MAX_QRCODES})
         </Text>
+
+        <Pressable
+          style={({ pressed }) => [styles.syncBtn, pressed && pressedDim]}
+          android_ripple={ripple.onDark}
+          onPress={onSync}
+          disabled={syncing}
+        >
+          <Text style={styles.syncBtnText}>
+            {syncing ? 'Syncing…' : '☁ Sync QR Codes (across devices)'}
+          </Text>
+        </Pressable>
 
         {!pendingImage ? (
           <View style={styles.pickRow}>
@@ -157,6 +189,16 @@ export default function PaymentQrScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
   hint: { fontSize: 13, color: colors.textMuted, lineHeight: 19, marginBottom: 10 },
+  syncBtn: {
+    backgroundColor: colors.accentBlue,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 10,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  syncBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   pickRow: { flexDirection: 'row', gap: 8 },
   pickBtn: {
     flex: 1,

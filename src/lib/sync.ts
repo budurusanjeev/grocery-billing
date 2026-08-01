@@ -1,8 +1,19 @@
-import { getBills, loadItems, saveItems, type Item, type Unit } from './db';
+import {
+  getBills,
+  loadItems,
+  loadQrCodes,
+  MAX_QRCODES,
+  saveItems,
+  saveQrCodes,
+  type Item,
+  type QrCode,
+  type Unit,
+} from './db';
 import { supabase } from './supabase';
 
 const ITEMS_URL = process.env.EXPO_PUBLIC_ITEMS_URL ?? 'http://localhost:5050/api/v1/items';
 const BILLS_URL = process.env.EXPO_PUBLIC_BILLS_URL ?? 'http://localhost:5050/api/v1/bills';
+const QRCODES_URL = process.env.EXPO_PUBLIC_QRCODES_URL ?? 'http://localhost:5050/api/v1/qrcodes';
 
 interface ServerItemRow {
   id: string;
@@ -28,9 +39,9 @@ function toLocalItem(row: ServerItemRow): Item {
   };
 }
 
-export interface SyncResult {
+export interface SyncResult<T = Item> {
   added: number;
-  items: Item[];
+  items: T[];
 }
 
 // Pulls every item the shopkeeper has added on the server (e.g. via a future
@@ -116,4 +127,95 @@ export async function uploadBills(): Promise<{ uploaded: number }> {
 
   const body = await res.json();
   return { uploaded: typeof body?.uploaded === 'number' ? body.uploaded : bills.length };
+}
+
+interface ServerQrRow {
+  id: string;
+  label: string;
+  image_uri: string;
+}
+
+function toLocalQrCode(row: ServerQrRow): QrCode {
+  return { id: row.id, label: row.label, imageUri: row.image_uri };
+}
+
+// Pushes every locally-saved QR code up to the server, then pulls down any
+// QR codes saved from a different device and merges them in (append-only,
+// matched by id — never overwrites a local edit). Run together so tapping
+// one "Sync" button reconciles both directions; on-demand only, same as
+// items and bills — there is no automatic/background sync anywhere in this app.
+export async function syncQrCodes(): Promise<SyncResult<QrCode>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('Please log in first.');
+  }
+  const authHeader = { Authorization: `Bearer ${session.access_token}` };
+
+  const local = await loadQrCodes();
+  if (local.length > 0) {
+    const pushRes = await fetch(QRCODES_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader },
+      body: JSON.stringify(local),
+    });
+    if (!pushRes.ok) {
+      let detail = `HTTP ${pushRes.status}`;
+      try {
+        const body = await pushRes.json();
+        detail = body?.error ?? detail;
+      } catch {
+        // keep the status-only message
+      }
+      throw new Error(detail);
+    }
+  }
+
+  const pullRes = await fetch(QRCODES_URL, { headers: authHeader });
+  if (!pullRes.ok) {
+    let detail = `HTTP ${pullRes.status}`;
+    try {
+      const body = await pullRes.json();
+      detail = body?.error ?? detail;
+    } catch {
+      // keep the status-only message
+    }
+    throw new Error(detail);
+  }
+
+  const pullBody = await pullRes.json();
+  const serverRows: ServerQrRow[] = Array.isArray(pullBody?.qrCodes) ? pullBody.qrCodes : [];
+
+  const localIds = new Set(local.map((qr) => qr.id));
+  const fresh = serverRows.map(toLocalQrCode).filter((qr) => !localIds.has(qr.id));
+
+  if (fresh.length === 0) {
+    return { added: 0, items: local };
+  }
+
+  // A device that's behind on syncing shouldn't silently lose the newest
+  // codes off the end — keep the most recent MAX_QRCODES overall rather
+  // than truncating what just arrived from the server.
+  const merged = [...local, ...fresh].slice(-MAX_QRCODES);
+  await saveQrCodes(merged);
+  return { added: fresh.length, items: merged };
+}
+
+// Best-effort: removes a QR code from the server too, so it doesn't come
+// back on the next sync from another device. Never throws — deleting
+// locally must still succeed even if the shopkeeper is offline or logged out.
+export async function deleteQrCodeRemote(id: string): Promise<void> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+    await fetch(`${QRCODES_URL}/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+  } catch {
+    // offline or server unreachable — the local delete already went through
+  }
 }

@@ -142,6 +142,10 @@ export async function loadQrCodes(): Promise<QrCode[]> {
   return raw ? JSON.parse(raw) : [];
 }
 
+export async function saveQrCodes(qrCodes: QrCode[]): Promise<void> {
+  await AsyncStorage.setItem(QRCODES_KEY, JSON.stringify(qrCodes));
+}
+
 export async function addQrCode(qr: Omit<QrCode, 'id'>): Promise<QrCode[]> {
   const existing = await loadQrCodes();
   if (existing.length >= MAX_QRCODES) {

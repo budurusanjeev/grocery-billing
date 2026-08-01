@@ -7,6 +7,7 @@ const cors = require('cors');
 const { requireShopkeeper } = require('./middleware/auth');
 const itemsRouter = require('./routes/items');
 const billsRouter = require('./routes/bills');
+const qrcodesRouter = require('./routes/qrcodes');
 
 const app = express();
 app.use(cors());
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/items', requireShopkeeper, itemsRouter);
 app.use('/api/v1/bills', requireShopkeeper, billsRouter);
+app.use('/api/v1/qrcodes', requireShopkeeper, qrcodesRouter);
 
 app.post('/api/v1/scan', async (req, res) => {
   const { image, mimeType } = req.body || {};
