@@ -1,3 +1,4 @@
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
@@ -51,16 +52,23 @@ export default function PaymentQrScreen() {
     }
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
-      base64: true,
-      quality: 0.7,
+      quality: 0.9,
     };
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    const asset = result.assets[0];
-    const mimeType = asset.mimeType ?? 'image/jpeg';
-    setPendingImage(`data:${mimeType};base64,${asset.base64}`);
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+
+    // Downscale before storing — an unresized camera photo/screenshot can be
+    // several megapixels, which some Android devices fail to decode/render
+    // at larger on-screen sizes (works as a small thumbnail, goes blank at
+    // the bigger Pay-screen / full-screen size). A QR code needs very
+    // little resolution to stay scannable, so capping the width also keeps
+    // the cross-device sync payload small.
+    const resized = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 800 }).renderAsync();
+    const saved = await resized.saveAsync({ compress: 0.8, format: SaveFormat.JPEG, base64: true });
+    if (!saved.base64) return;
+    setPendingImage(`data:image/jpeg;base64,${saved.base64}`);
   };
 
   const onSave = async () => {

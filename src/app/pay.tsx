@@ -465,7 +465,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   fullQrLabel: { fontSize: 20, fontWeight: '800', color: colors.brandDark, marginBottom: 20 },
-  fullQrImage: { width: '100%', height: '70%' },
+  // aspectRatio + a percentage width, not a percentage height — Image
+  // doesn't reliably resolve a percentage height on its own the way a plain
+  // View does, which was rendering as a blank/zero-size box.
+  fullQrImage: { width: '85%', maxWidth: 420, aspectRatio: 1 },
   fullQrHint: { marginTop: 24, fontSize: 14, color: colors.textMuted },
   footer: { flexDirection: 'row', gap: 8, paddingTop: 16 },
   cancelBtn: {
