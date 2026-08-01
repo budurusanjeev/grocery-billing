@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getBills, type Bill } from '../lib/db';
+import { requireInternet } from '../lib/network';
 import { uploadBills } from '../lib/sync';
 import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
@@ -45,6 +46,7 @@ export default function HistoryScreen() {
   };
 
   const onUploadAll = async () => {
+    if (!(await requireInternet())) return;
     setUploading(true);
     try {
       const { uploaded } = await uploadBills();

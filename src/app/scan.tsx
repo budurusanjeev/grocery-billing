@@ -15,6 +15,7 @@ import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, type Item } from '../lib/db';
 import { parseGroceryPhoto } from '../lib/gemini';
 import { matchItem } from '../lib/matcher';
+import { requireInternet } from '../lib/network';
 import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
@@ -39,6 +40,7 @@ export default function ScanScreen() {
   }, []);
 
   const processImage = async (base64: string, mimeType: string) => {
+    if (!(await requireInternet())) return;
     setLoading(true);
     setError(null);
     setRows([]);

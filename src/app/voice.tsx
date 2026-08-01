@@ -11,10 +11,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import ScreenContainer from '../components/ScreenContainer';
 import { loadItems, type Item } from '../lib/db';
 import { matchItem } from '../lib/matcher';
-import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
+import { requireInternet } from '../lib/network';
+import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { parseTranscript } from '../lib/voiceParser';
 import { useBill } from '../state/bill';
@@ -112,6 +112,13 @@ export default function VoiceScreen() {
   };
 
   const startRecognizer = async () => {
+    // Speech recognition (on web, and on most Android devices) sends audio
+    // to a cloud service to transcribe — without internet it fails silently
+    // or with a confusing generic error, so check up front and say so plainly.
+    if (!(await requireInternet())) {
+      keepListeningRef.current = false;
+      return;
+    }
     try {
       const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!perm.granted) {
@@ -150,133 +157,153 @@ export default function VoiceScreen() {
     await startRecognizer();
   };
 
-  return (
-    <ScreenContainer>
-      <View style={styles.screen}>
-        {/* Everything (controls + spoken items + total + done) lives inside
-            ONE FlatList via header/footer components, so the whole screen
-            scrolls as a unit. Previously the controls above the list (mic
-            button, hint, "Not understood" box) were fixed outside any
-            scroll view — a long "Not understood" list could push the total
-            bar and Done button off-screen with no way to reach them. */}
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          data={lines}
-          keyExtractor={(l) => l.itemId}
-          ListHeaderComponent={
-            <View>
-              <View style={styles.langRow}>
-                {LANGUAGES.map((l) => (
-                  <Pressable
-                    key={l.code}
-                    style={({ pressed }) => [
-                      styles.langChip,
-                      lang === l.code && styles.langChipActive,
-                      pressed && pressedDim,
-                    ]}
-                    android_ripple={ripple.onLight}
-                    onPress={() => !listening && setLang(l.code)}
-                  >
-                    <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>
-                      {l.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+  const goBack = () => {
+    // After a browser refresh there is no history, so "back" has nowhere
+    // to go — fall back to the billing screen directly.
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.micBtn,
-                  listening && styles.micBtnActive,
-                  pressed && pressedDim,
-                ]}
-                android_ripple={ripple.onDark}
-                onPress={toggleListening}
-              >
-                <Text style={styles.micIcon}>🎤</Text>
-                <Text style={styles.micLabel}>
-                  {listening ? 'Listening… say the next item, or tap to stop' : 'Tap to speak'}
-                </Text>
-              </Pressable>
-
-              {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
-
-              {justAdded && (
-                <View style={styles.addedToast}>
-                  <Text style={styles.addedToastText}>✓ Added {justAdded}</Text>
-                </View>
-              )}
-
-              <Text style={styles.hint}>
-                Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
-              </Text>
-
-              {unmatched.length > 0 && (
-                <View style={styles.unmatchedBox}>
-                  <Text style={styles.unmatchedTitle}>Not understood:</Text>
-                  <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
-                </View>
-              )}
-            </View>
-          }
-          ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
-          ListFooterComponent={
-            <View>
-              <View style={styles.totalBar}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>{formatMoney(total)}</Text>
-              </View>
-
-              <Pressable
-                style={({ pressed }) => [styles.doneBtn, pressed && pressedDim]}
-                android_ripple={ripple.onDark}
-                onPress={() => {
-                  // After a browser refresh there is no history, so "back" has
-                  // nowhere to go — fall back to the billing screen directly.
-                  if (router.canGoBack()) router.back();
-                  else router.replace('/');
-                }}
-              >
-                <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
-              </Pressable>
-            </View>
-          }
-          renderItem={({ item: l }) => (
-            <View style={styles.lineRow}>
-              <View style={styles.lineInfo}>
-                <Text style={styles.lineName}>{l.name}</Text>
-                <Text style={styles.lineMeta}>
-                  {l.qty} {l.unit} × {formatMoney(l.price)}
-                </Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
-                android_ripple={ripple.onLight}
-                onPress={() => updateQty(l.itemId, l.qty - 1)}
-              >
-                <Text style={styles.qtyBtnText}>−</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
-                android_ripple={ripple.onLight}
-                onPress={() => updateQty(l.itemId, l.qty + 1)}
-              >
-                <Text style={styles.qtyBtnText}>+</Text>
-              </Pressable>
-              <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
-              <Pressable
-                style={({ pressed }) => [styles.removeBtn, pressed && pressedDim]}
-                android_ripple={ripple.onLight}
-                onPress={() => removeLine(l.itemId)}
-              >
-                <Text style={styles.remove}>✕</Text>
-              </Pressable>
-            </View>
-          )}
-        />
+  const controlsBlock = (
+    <View>
+      <View style={styles.langRow}>
+        {LANGUAGES.map((l) => (
+          <Pressable
+            key={l.code}
+            style={({ pressed }) => [
+              styles.langChip,
+              lang === l.code && styles.langChipActive,
+              pressed && pressedDim,
+            ]}
+            android_ripple={ripple.onLight}
+            onPress={() => !listening && setLang(l.code)}
+          >
+            <Text style={[styles.langText, lang === l.code && styles.langTextActive]}>{l.label}</Text>
+          </Pressable>
+        ))}
       </View>
-    </ScreenContainer>
+
+      <Pressable
+        style={({ pressed }) => [styles.micBtn, listening && styles.micBtnActive, pressed && pressedDim]}
+        android_ripple={ripple.onDark}
+        onPress={toggleListening}
+      >
+        <Text style={styles.micIcon}>🎤</Text>
+        <Text style={styles.micLabel}>
+          {listening ? 'Listening… say the next item, or tap to stop' : 'Tap to speak'}
+        </Text>
+      </Pressable>
+
+      {interim !== '' && <Text style={styles.interim}>{interim}</Text>}
+
+      {justAdded && (
+        <View style={styles.addedToast}>
+          <Text style={styles.addedToastText}>✓ Added {justAdded}</Text>
+        </View>
+      )}
+
+      <Text style={styles.hint}>
+        Say item and quantity, e.g. “kandi pappu rendu kilolu” or “Parle-G four packets”.
+      </Text>
+
+      {unmatched.length > 0 && (
+        <View style={styles.unmatchedBox}>
+          <Text style={styles.unmatchedTitle}>Item not found:</Text>
+          <Text style={styles.unmatchedText}>{unmatched.join(', ')}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const totalAndDone = (
+    <View>
+      <View style={styles.totalBar}>
+        <Text style={styles.totalLabel}>Total</Text>
+        <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+      </View>
+
+      <Pressable style={({ pressed }) => [styles.doneBtn, pressed && pressedDim]} android_ripple={ripple.onDark} onPress={goBack}>
+        <Text style={styles.doneBtnText}>✓ Done — back to bill</Text>
+      </Pressable>
+    </View>
+  );
+
+  const renderLine = ({ item: l }: { item: (typeof lines)[number] }) => (
+    <View style={styles.lineRow}>
+      <View style={styles.lineInfo}>
+        <Text style={styles.lineName}>{l.name}</Text>
+        <Text style={styles.lineMeta}>
+          {l.qty} {l.unit} × {formatMoney(l.price)}
+        </Text>
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+        android_ripple={ripple.onLight}
+        onPress={() => updateQty(l.itemId, l.qty - 1)}
+      >
+        <Text style={styles.qtyBtnText}>−</Text>
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+        android_ripple={ripple.onLight}
+        onPress={() => updateQty(l.itemId, l.qty + 1)}
+      >
+        <Text style={styles.qtyBtnText}>+</Text>
+      </Pressable>
+      <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
+      <Pressable
+        style={({ pressed }) => [styles.removeBtn, pressed && pressedDim]}
+        android_ripple={ripple.onLight}
+        onPress={() => removeLine(l.itemId)}
+      >
+        <Text style={styles.remove}>✕</Text>
+      </Pressable>
+    </View>
+  );
+
+  if (isWeb) {
+    // Web: two independent full-width panels — voice controls on the left,
+    // spoken/added items on the right — instead of one narrow scrolling
+    // column, which wasted almost the whole browser width.
+    return (
+      <View style={styles.page}>
+        <View style={styles.controlsPanel}>
+          {controlsBlock}
+          {totalAndDone}
+        </View>
+        <View style={styles.itemsPanel}>
+          <FlatList
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            data={lines}
+            keyExtractor={(l) => l.itemId}
+            ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
+            renderItem={renderLine}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.screen}>
+      {/* Everything (controls + spoken items + total + done) lives inside
+          ONE FlatList via header/footer components, so the whole screen
+          scrolls as a unit. Previously the controls above the list (mic
+          button, hint, "Item not found" box) were fixed outside any
+          scroll view — a long list could push the total bar and Done
+          button off-screen with no way to reach them. */}
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        data={lines}
+        keyExtractor={(l) => l.itemId}
+        ListHeaderComponent={controlsBlock}
+        ListEmptyComponent={<Text style={styles.empty}>Spoken items will appear here.</Text>}
+        ListFooterComponent={totalAndDone}
+        renderItem={renderLine}
+      />
+    </View>
   );
 }
 
@@ -287,6 +314,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: spacing.listBottom,
+  },
+  // Web-only two-panel layout — mirrors the Billing screen's approach: two
+  // genuinely separate full-width panels instead of one narrow centered
+  // column, with a fixed-ish left panel (controls don't need to stretch)
+  // and the items list taking up the remaining space.
+  page: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.bg,
+    padding: 12,
+    gap: 12,
+  },
+  controlsPanel: {
+    width: '38%',
+    maxWidth: 360,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 16,
+    ...raisedShadow,
+  },
+  itemsPanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 12,
+    ...raisedShadow,
   },
   langRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
   langChip: {

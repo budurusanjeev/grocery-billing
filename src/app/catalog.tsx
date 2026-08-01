@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { ALL_CATEGORIES, CATEGORY_ORDER, iconFor } from '../lib/categories';
 import { addItem, loadItems, updateItem, type Item, type Unit } from '../lib/db';
+import { requireInternet } from '../lib/network';
 import { fetchAndMergeNewItems } from '../lib/sync';
 import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { confirmDialog, showMessage } from '../lib/ui';
@@ -210,6 +211,7 @@ export default function CatalogScreen() {
   };
 
   const onFetchNewItems = async () => {
+    if (!(await requireInternet())) return;
     setSyncing(true);
     try {
       const { added, items: merged } = await fetchAndMergeNewItems();

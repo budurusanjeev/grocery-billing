@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
+import { requireInternet } from '../lib/network';
 import { cardShadow, colors, pressedDim, radius, ripple } from '../lib/theme';
 import { showMessage } from '../lib/ui';
 import { useAuth } from '../state/auth';
@@ -18,6 +19,7 @@ export default function LoginScreen() {
       showMessage('Missing details', 'Enter your email and PIN.');
       return;
     }
+    if (!(await requireInternet())) return;
     setSubmitting(true);
     const { error } = await signInWithPin(email.trim(), pin);
     setSubmitting(false);
