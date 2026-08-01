@@ -151,6 +151,15 @@ export default function PayScreen() {
 
         {method === 'upi' && (
           <View style={styles.upiSection}>
+            {qrCodes.length > 0 && (
+              <Pressable
+                style={({ pressed }) => [styles.manageQrBtn, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
+                onPress={() => router.push('/payment-qr')}
+              >
+                <Text style={styles.manageQrBtnText}>⚙ Manage QR Codes</Text>
+              </Pressable>
+            )}
             {qrCodes.length === 0 ? (
               <View style={styles.noQr}>
                 <Text style={styles.noQrText}>No QR codes saved yet.</Text>
@@ -293,6 +302,8 @@ const styles = StyleSheet.create({
   methodLabel: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
   methodLabelActive: { color: colors.brandDark },
   upiSection: { marginTop: 4 },
+  manageQrBtn: { alignSelf: 'flex-end', paddingVertical: 6, paddingHorizontal: 4, overflow: 'hidden' },
+  manageQrBtnText: { color: colors.accentBlue, fontSize: 13, fontWeight: '700' },
   noQr: { alignItems: 'center', paddingVertical: 16, gap: 10 },
   noQrText: { color: colors.textMuted, fontSize: 14 },
   addQrBtn: {
