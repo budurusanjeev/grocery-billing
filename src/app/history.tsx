@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import ScreenContainer from '../components/ScreenContainer';
 import { getBills, type Bill } from '../lib/db';
 import { uploadBills } from '../lib/sync';
 import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
@@ -79,7 +78,6 @@ export default function HistoryScreen() {
   };
 
   return (
-    <ScreenContainer>
       <View style={styles.screen}>
         <View style={styles.summaryCard}>
           <View style={styles.summaryStat}>
@@ -187,7 +185,6 @@ export default function HistoryScreen() {
           }}
         />
       </View>
-    </ScreenContainer>
   );
 }
 
