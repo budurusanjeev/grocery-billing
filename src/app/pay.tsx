@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { loadQrCodes, saveBill, type PaymentMethod, type QrCode } from '../lib/db';
-import { cardShadow, colors, pressedDim, radius, ripple } from '../lib/theme';
+import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
@@ -108,6 +108,175 @@ export default function PayScreen() {
     );
   }
 
+  const totalBarEl = (
+    <View style={styles.totalBar}>
+      <View>
+        <Text style={styles.totalLabel}>Amount Due</Text>
+        {discount > 0 && (
+          <Text style={styles.discountHint}>
+            {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+    </View>
+  );
+
+  const methodRowEl = (
+    <>
+      <Text style={styles.sectionLabel}>How is the customer paying?</Text>
+      <View style={styles.methodRow}>
+        {METHODS.map((m) => (
+          <Pressable
+            key={m.key}
+            style={({ pressed }) => [
+              styles.methodChip,
+              method === m.key && styles.methodChipActive,
+              pressed && pressedDim,
+            ]}
+            android_ripple={ripple.onLight}
+            onPress={() => setMethod(m.key)}
+          >
+            <Text style={styles.methodIcon}>{m.icon}</Text>
+            <Text style={[styles.methodLabel, method === m.key && styles.methodLabelActive]}>{m.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+
+  // On web the selected QR is shown full-size in its own panel facing the
+  // customer (see the isWeb branch below) — this section then only needs a
+  // compact confirmation instead of duplicating the same big image. On
+  // mobile there's no second panel to show it in, so it stays inline here.
+  const qrSectionEl = method === 'upi' && (
+    <View style={styles.upiSection}>
+      {qrCodes.length > 0 && (
+        <Pressable
+          style={({ pressed }) => [styles.manageQrBtn, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={() => router.push('/payment-qr')}
+        >
+          <Text style={styles.manageQrBtnText}>⚙ Manage QR Codes</Text>
+        </Pressable>
+      )}
+      {qrCodes.length === 0 ? (
+        <View style={styles.noQr}>
+          <Text style={styles.noQrText}>No QR codes saved yet.</Text>
+          <Pressable
+            style={({ pressed }) => [styles.addQrBtn, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={() => router.push('/payment-qr')}
+          >
+            <Text style={styles.addQrBtnText}>+ Add a QR Code</Text>
+          </Pressable>
+        </View>
+      ) : selectedQr ? (
+        isWeb ? (
+          <View style={styles.qrConfirm}>
+            <Text style={styles.qrConfirmText}>✓ “{selectedQr.label}” is showing on the left for the customer to scan</Text>
+            <Pressable
+              style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
+              onPress={() => setSelectedQr(null)}
+            >
+              <Text style={styles.changeQrBtnText}>Choose a different QR code</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.qrDisplay}>
+            <Text style={styles.qrDisplayLabel}>{selectedQr.label}</Text>
+            <Image source={{ uri: selectedQr.imageUri }} style={styles.qrImage} resizeMode="contain" />
+            <Pressable
+              style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
+              onPress={() => setSelectedQr(null)}
+            >
+              <Text style={styles.changeQrBtnText}>Choose a different QR code</Text>
+            </Pressable>
+          </View>
+        )
+      ) : (
+        <>
+          <Text style={styles.sectionLabel}>Pick which QR code to show</Text>
+          <View style={styles.qrGrid}>
+            {qrCodes.map((qr) => (
+              <Pressable
+                key={qr.id}
+                style={({ pressed }) => [styles.qrCard, pressed && pressedDim]}
+                android_ripple={ripple.onLight}
+                onPress={() => setSelectedQr(qr)}
+              >
+                <Image source={{ uri: qr.imageUri }} style={styles.qrThumb} resizeMode="contain" />
+                <Text style={styles.qrCardLabel} numberOfLines={1}>
+                  {qr.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+    </View>
+  );
+
+  const footerEl = (
+    <View style={styles.footer}>
+      <Pressable
+        style={({ pressed }) => [styles.cancelBtn, pressed && pressedDim]}
+        android_ripple={ripple.onLight}
+        onPress={() => router.back()}
+      >
+        <Text style={styles.cancelBtnText}>Cancel</Text>
+      </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.confirmBtn, pressed && pressedDim]}
+        android_ripple={ripple.onDark}
+        onPress={finish}
+        disabled={saving}
+      >
+        <Text style={styles.confirmBtnText}>{saving ? 'Saving…' : '✓ Confirm Payment'}</Text>
+      </Pressable>
+    </View>
+  );
+
+  if (isWeb) {
+    // Two panels: the left one is meant to face the customer, showing the
+    // selected QR code full-size so they can scan it directly off the
+    // screen; the shopkeeper operates the right panel exactly as before
+    // (method selection, QR picker, Cancel/Confirm).
+    return (
+      <View style={styles.page}>
+        <View style={styles.qrPanel}>
+          {method === 'upi' && selectedQr ? (
+            <>
+              <Text style={styles.qrPanelLabel}>{selectedQr.label}</Text>
+              <Image source={{ uri: selectedQr.imageUri }} style={styles.qrPanelImage} resizeMode="contain" />
+              <Text style={styles.qrPanelHint}>Scan to pay {formatMoney(total)}</Text>
+            </>
+          ) : (
+            <View style={styles.qrPanelEmptyBox}>
+              <Text style={styles.qrPanelEmptyIcon}>📱</Text>
+              <Text style={styles.qrPanelEmptyText}>
+                {method === 'upi'
+                  ? 'Pick a QR code on the right — it will appear here full-size for the customer to scan.'
+                  : 'Select UPI as the payment method to show a scannable QR code here.'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.controlsPanel}>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            {totalBarEl}
+            {methodRowEl}
+            {qrSectionEl}
+          </ScrollView>
+          {footerEl}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScreenContainer>
       <View style={styles.screen}>
@@ -116,114 +285,11 @@ export default function PayScreen() {
             to scroll, trapping the "choose a different QR code" button and
             the footer (Cancel/Confirm) off-screen with no way to reach them. */}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.totalBar}>
-          <View>
-            <Text style={styles.totalLabel}>Amount Due</Text>
-            {discount > 0 && (
-              <Text style={styles.discountHint}>
-                {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
-              </Text>
-            )}
-          </View>
-          <Text style={styles.totalValue}>{formatMoney(total)}</Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>How is the customer paying?</Text>
-        <View style={styles.methodRow}>
-          {METHODS.map((m) => (
-            <Pressable
-              key={m.key}
-              style={({ pressed }) => [
-                styles.methodChip,
-                method === m.key && styles.methodChipActive,
-                pressed && pressedDim,
-              ]}
-              android_ripple={ripple.onLight}
-              onPress={() => setMethod(m.key)}
-            >
-              <Text style={styles.methodIcon}>{m.icon}</Text>
-              <Text style={[styles.methodLabel, method === m.key && styles.methodLabelActive]}>
-                {m.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {method === 'upi' && (
-          <View style={styles.upiSection}>
-            {qrCodes.length > 0 && (
-              <Pressable
-                style={({ pressed }) => [styles.manageQrBtn, pressed && pressedDim]}
-                android_ripple={ripple.onLight}
-                onPress={() => router.push('/payment-qr')}
-              >
-                <Text style={styles.manageQrBtnText}>⚙ Manage QR Codes</Text>
-              </Pressable>
-            )}
-            {qrCodes.length === 0 ? (
-              <View style={styles.noQr}>
-                <Text style={styles.noQrText}>No QR codes saved yet.</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.addQrBtn, pressed && pressedDim]}
-                  android_ripple={ripple.onDark}
-                  onPress={() => router.push('/payment-qr')}
-                >
-                  <Text style={styles.addQrBtnText}>+ Add a QR Code</Text>
-                </Pressable>
-              </View>
-            ) : selectedQr ? (
-              <View style={styles.qrDisplay}>
-                <Text style={styles.qrDisplayLabel}>{selectedQr.label}</Text>
-                <Image source={{ uri: selectedQr.imageUri }} style={styles.qrImage} resizeMode="contain" />
-                <Pressable
-                  style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
-                  android_ripple={ripple.onLight}
-                  onPress={() => setSelectedQr(null)}
-                >
-                  <Text style={styles.changeQrBtnText}>Choose a different QR code</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.sectionLabel}>Pick which QR code to show</Text>
-                <View style={styles.qrGrid}>
-                  {qrCodes.map((qr) => (
-                    <Pressable
-                      key={qr.id}
-                      style={({ pressed }) => [styles.qrCard, pressed && pressedDim]}
-                      android_ripple={ripple.onLight}
-                      onPress={() => setSelectedQr(qr)}
-                    >
-                      <Image source={{ uri: qr.imageUri }} style={styles.qrThumb} resizeMode="contain" />
-                      <Text style={styles.qrCardLabel} numberOfLines={1}>
-                        {qr.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
-          </View>
-        )}
+          {totalBarEl}
+          {methodRowEl}
+          {qrSectionEl}
         </ScrollView>
-
-        <View style={styles.footer}>
-          <Pressable
-            style={({ pressed }) => [styles.cancelBtn, pressed && pressedDim]}
-            android_ripple={ripple.onLight}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.confirmBtn, pressed && pressedDim]}
-            android_ripple={ripple.onDark}
-            onPress={finish}
-            disabled={saving}
-          >
-            <Text style={styles.confirmBtnText}>{saving ? 'Saving…' : '✓ Confirm Payment'}</Text>
-          </Pressable>
-        </View>
+        {footerEl}
       </View>
     </ScreenContainer>
   );
@@ -231,6 +297,46 @@ export default function PayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
+  // Web-only two-panel layout: a customer-facing QR panel on the left, the
+  // shopkeeper's controls (unchanged) on the right — mirrors the two-panel
+  // pattern used on the Billing and Voice screens.
+  page: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.bg,
+    padding: 12,
+    gap: 12,
+  },
+  qrPanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...raisedShadow,
+  },
+  qrPanelLabel: { fontSize: 20, fontWeight: '800', color: colors.brandDark, marginBottom: 16 },
+  qrPanelImage: { width: '90%', maxWidth: 420, height: 420 },
+  qrPanelHint: { marginTop: 16, fontSize: 16, fontWeight: '700', color: colors.text },
+  qrPanelEmptyBox: { alignItems: 'center', paddingHorizontal: 30 },
+  qrPanelEmptyIcon: { fontSize: 48, marginBottom: 12, opacity: 0.4 },
+  qrPanelEmptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 15, lineHeight: 22 },
+  controlsPanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 16,
+    ...raisedShadow,
+  },
+  qrConfirm: {
+    backgroundColor: colors.brandLight,
+    borderRadius: radius.lg,
+    padding: 16,
+    alignItems: 'center',
+    gap: 4,
+  },
+  qrConfirmText: { color: colors.brandDark, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   successBox: {
