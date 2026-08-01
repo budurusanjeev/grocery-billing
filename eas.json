@@ -13,6 +13,7 @@
         "EXPO_PUBLIC_SCAN_URL": "https://grocery-billing-server.onrender.com/api/v1/scan",
         "EXPO_PUBLIC_ITEMS_URL": "https://grocery-billing-server.onrender.com/api/v1/items",
         "EXPO_PUBLIC_BILLS_URL": "https://grocery-billing-server.onrender.com/api/v1/bills",
+        "EXPO_PUBLIC_QRCODES_URL": "https://grocery-billing-server.onrender.com/api/v1/qrcodes",
         "EXPO_PUBLIC_SUPABASE_URL": "https://flqwurfvryzifwfuyybm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9",
         "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin"
@@ -27,6 +28,7 @@
         "EXPO_PUBLIC_SCAN_URL": "https://grocery-billing-server.onrender.com/api/v1/scan",
         "EXPO_PUBLIC_ITEMS_URL": "https://grocery-billing-server.onrender.com/api/v1/items",
         "EXPO_PUBLIC_BILLS_URL": "https://grocery-billing-server.onrender.com/api/v1/bills",
+        "EXPO_PUBLIC_QRCODES_URL": "https://grocery-billing-server.onrender.com/api/v1/qrcodes",
         "EXPO_PUBLIC_SUPABASE_URL": "https://flqwurfvryzifwfuyybm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9",
         "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin"
