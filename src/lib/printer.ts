@@ -261,6 +261,37 @@ function buildReceiptHtml(bill: Bill, shopName: string): string {
     </html>`;
 }
 
+// expo-print's web implementation is just a `window.print()` stub — it
+// ignores the `html` option entirely and prints whatever's on the current
+// page (which was showing the raw app UI instead of the receipt). Work
+// around it with the standard technique for printing custom content on the
+// web: write the HTML into a hidden iframe and print that iframe instead.
+function printHtmlOnWeb(html: string): void {
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not open the print preview.');
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  iframe.contentWindow?.focus();
+  iframe.contentWindow?.print();
+  // Give the browser's print dialog time to actually open before tearing
+  // down the iframe it's reading from.
+  setTimeout(() => document.body.removeChild(iframe), 1000);
+}
+
 // Uses Android/iOS's own system Print dialog (or the browser's print dialog
 // on web) — works with any WiFi/network printer already set up on the
 // device, or "Save as PDF", with no pairing or permissions needed at all.
@@ -268,5 +299,9 @@ function buildReceiptHtml(bill: Bill, shopName: string): string {
 // above: different hardware, different button, both available side by side.
 export async function printBillSystemDialog(bill: Bill, shopName: string): Promise<void> {
   const html = buildReceiptHtml(bill, shopName);
+  if (isWeb) {
+    printHtmlOnWeb(html);
+    return;
+  }
   await Print.printAsync({ html });
 }
