@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
-import { loadQrCodes, saveBill, type PaymentMethod, type QrCode } from '../lib/db';
+import { loadPrinter, loadQrCodes, saveBill, type Bill, type PaymentMethod, type QrCode } from '../lib/db';
+import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
 import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
@@ -22,10 +23,13 @@ export default function PayScreen() {
   const [saving, setSaving] = useState(false);
   const [paidText, setPaidText] = useState<string | null>(null);
   const [showFullQr, setShowFullQr] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printingSystem, setPrintingSystem] = useState(false);
   // total comes live from useBill() and recalculates to 0 the instant
   // clear() runs — capture the amount that was actually paid before
   // clearing, so the success screen doesn't show ₹0.
   const [paidAmount, setPaidAmount] = useState(0);
+  const [paidBill, setPaidBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     if (method === 'upi') {
@@ -46,7 +50,8 @@ export default function PayScreen() {
     }
     setSaving(true);
     try {
-      await saveBill(lines, total, method, customerType, discount);
+      const bill = await saveBill(lines, total, method, customerType, discount);
+      setPaidBill(bill);
       const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
       const text = [
         'Kirana Bill',
@@ -77,6 +82,35 @@ export default function PayScreen() {
     Linking.openURL(`https://wa.me/?text=${encodeURIComponent(paidText)}`);
   };
 
+  const onPrint = async () => {
+    if (!paidBill) return;
+    const printer = await loadPrinter();
+    if (!printer) {
+      showMessage('No printer set up', 'Go to Printer Setup to connect a Bluetooth receipt printer first.');
+      return;
+    }
+    setPrinting(true);
+    try {
+      await printBillReceipt(printer.address, paidBill, 'Kirana Bill');
+    } catch (e: any) {
+      showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const onPrintSystem = async () => {
+    if (!paidBill) return;
+    setPrintingSystem(true);
+    try {
+      await printBillSystemDialog(paidBill, 'Kirana Bill');
+    } catch (e: any) {
+      showMessage('Could not print', e?.message ?? 'Something went wrong opening the print dialog.');
+    } finally {
+      setPrintingSystem(false);
+    }
+  };
+
   const onDone = () => router.replace('/');
 
   if (paidText) {
@@ -95,6 +129,28 @@ export default function PayScreen() {
             onPress={onShareWhatsApp}
           >
             <Text style={styles.shareBtnText}>📤 Share on WhatsApp</Text>
+          </Pressable>
+
+          {!isWeb && (
+            <Pressable
+              style={({ pressed }) => [styles.printBtn, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
+              onPress={onPrint}
+              disabled={printing}
+            >
+              <Text style={styles.printBtnText}>{printing ? 'Printing…' : '🖨 Print Receipt (Bluetooth)'}</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [styles.printSystemBtn, pressed && pressedDim]}
+            android_ripple={ripple.onLight}
+            onPress={onPrintSystem}
+            disabled={printingSystem}
+          >
+            <Text style={styles.printSystemBtnText}>
+              {printingSystem ? 'Opening print dialog…' : '🖶 Print (WiFi / Any Printer)'}
+            </Text>
           </Pressable>
 
           <Pressable
@@ -143,6 +199,15 @@ export default function PayScreen() {
           </Pressable>
         ))}
       </View>
+      {!isWeb && (
+        <Pressable
+          style={({ pressed }) => [styles.printerSetupLink, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={() => router.push('/printer-setup')}
+        >
+          <Text style={styles.printerSetupLinkText}>🖨 Receipt Printer Setup</Text>
+        </Pressable>
+      )}
     </>
   );
 
@@ -187,10 +252,19 @@ export default function PayScreen() {
         ) : (
           <View style={styles.qrDisplay}>
             <Text style={styles.qrDisplayLabel}>{selectedQr.label}</Text>
-            <Pressable onPress={() => setShowFullQr(true)}>
+            {/* The Image is a plain sibling here, NOT wrapped inside a
+                Pressable — on this device/RN version, an Image nested
+                directly inside a Pressable rendered completely blank
+                (loaded fine per onLoad, just never painted). Tapping the
+                QR code still works via a separate, absolutely-positioned
+                transparent Pressable layered on top of it instead. */}
+            <View style={styles.qrImageWrap}>
               <Image source={{ uri: selectedQr.imageUri }} style={styles.qrImage} resizeMode="contain" />
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFullQr(true)} />
+            </View>
+            <Pressable onPress={() => setShowFullQr(true)}>
+              <Text style={styles.tapToEnlargeHint}>⤢ Show full screen</Text>
             </Pressable>
-            <Text style={styles.tapToEnlargeHint}>Tap the QR code to show it full screen</Text>
             <Pressable
               style={({ pressed }) => [styles.changeQrBtn, pressed && pressedDim]}
               android_ripple={ripple.onLight}
@@ -209,7 +283,10 @@ export default function PayScreen() {
                 key={qr.id}
                 style={({ pressed }) => [styles.qrCard, pressed && pressedDim]}
                 android_ripple={ripple.onLight}
-                onPress={() => setSelectedQr(qr)}
+                onPress={() => {
+                  console.log('VIEW QR: selected', qr.label, 'len=', qr.imageUri.length);
+                  setSelectedQr(qr);
+                }}
               >
                 <Image source={{ uri: qr.imageUri }} style={styles.qrThumb} resizeMode="contain" />
                 <Text style={styles.qrCardLabel} numberOfLines={1}>
@@ -243,6 +320,33 @@ export default function PayScreen() {
     </View>
   );
 
+  // Full-screen, opaque white background — no dimmed/blurred overlay — so
+  // the QR code stays crisp and bright enough for the customer's phone
+  // camera to scan easily. Shared between the web and mobile layouts below.
+  const fullQrModal = selectedQr && (
+    <Modal visible={showFullQr} animationType="fade" onRequestClose={() => setShowFullQr(false)}>
+      {/* Image is a plain sibling here, NOT nested inside the Pressable
+          below — nesting an Image directly inside a Pressable rendered
+          completely blank on-device (loaded fine per onLoad, just never
+          painted). The Pressable is an absolutely-positioned transparent
+          overlay on top instead, which still catches a tap anywhere on
+          the screen to close, without wrapping the Image itself. */}
+      <View style={styles.fullQrScreen}>
+        <Text style={styles.fullQrLabel}>{selectedQr.label}</Text>
+        <Image source={{ uri: selectedQr.imageUri }} style={styles.fullQrImage} resizeMode="contain" />
+        <Text style={styles.fullQrHint}>Tap anywhere to close</Text>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFullQr(false)} />
+        <Pressable
+          style={({ pressed }) => [styles.fullQrCloseBtn, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={() => setShowFullQr(false)}
+        >
+          <Text style={styles.fullQrCloseBtnText}>✕</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+
   if (isWeb) {
     // Two panels: the shopkeeper operates the left panel as usual (method
     // selection, QR picker, Cancel/Confirm); the right panel faces the
@@ -263,7 +367,10 @@ export default function PayScreen() {
           {method === 'upi' && selectedQr ? (
             <>
               <Text style={styles.qrPanelLabel}>{selectedQr.label}</Text>
-              <Image source={{ uri: selectedQr.imageUri }} style={styles.qrPanelImage} resizeMode="contain" />
+              <View style={styles.qrImageWrap}>
+                <Image source={{ uri: selectedQr.imageUri }} style={styles.qrPanelImage} resizeMode="contain" />
+                <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFullQr(true)} />
+              </View>
               <Text style={styles.qrPanelHint}>Scan to pay {formatMoney(total)}</Text>
             </>
           ) : (
@@ -277,6 +384,7 @@ export default function PayScreen() {
             </View>
           )}
         </View>
+        {fullQrModal}
       </View>
     );
   }
@@ -295,19 +403,7 @@ export default function PayScreen() {
         </ScrollView>
         {footerEl}
       </View>
-
-      {/* Full-screen, opaque white background — no dimmed/blurred overlay —
-          so the QR code stays crisp and bright enough for the customer's
-          phone camera to scan easily. */}
-      {selectedQr && (
-        <Modal visible={showFullQr} animationType="fade" onRequestClose={() => setShowFullQr(false)}>
-          <Pressable style={styles.fullQrScreen} onPress={() => setShowFullQr(false)}>
-            <Text style={styles.fullQrLabel}>{selectedQr.label}</Text>
-            <Image source={{ uri: selectedQr.imageUri }} style={styles.fullQrImage} resizeMode="contain" />
-            <Text style={styles.fullQrHint}>Tap anywhere to close</Text>
-          </Pressable>
-        </Modal>
-      )}
+      {fullQrModal}
     </ScreenContainer>
   );
 }
@@ -385,6 +481,26 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   shareBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
+  printBtn: {
+    backgroundColor: colors.accentBlue,
+    borderRadius: radius.md,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 8,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  printBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
+  printSystemBtn: {
+    backgroundColor: colors.accentAmber,
+    borderRadius: radius.md,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 8,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  printSystemBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
   doneBtn: {
     backgroundColor: colors.border,
     borderRadius: radius.md,
@@ -421,6 +537,8 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   methodChipActive: { backgroundColor: colors.brandLight, borderColor: colors.brand },
+  printerSetupLink: { alignSelf: 'flex-start', paddingVertical: 8, borderRadius: radius.sm, overflow: 'hidden' },
+  printerSetupLinkText: { color: colors.accentBlue, fontSize: 13, fontWeight: '600' },
   methodIcon: { fontSize: 24, marginBottom: 4 },
   methodLabel: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
   methodLabelActive: { color: colors.brandDark },
@@ -451,6 +569,7 @@ const styles = StyleSheet.create({
   qrCardLabel: { fontSize: 12, fontWeight: '700', color: colors.text, marginTop: 6 },
   qrDisplay: { alignItems: 'center', backgroundColor: colors.card, borderRadius: radius.lg, padding: 16, ...cardShadow },
   qrDisplayLabel: { fontSize: 16, fontWeight: '800', color: colors.brandDark, marginBottom: 10 },
+  qrImageWrap: { width: '100%' },
   qrImage: { width: '100%', height: 260 },
   tapToEnlargeHint: { marginTop: 8, fontSize: 12, color: colors.textMuted },
   changeQrBtn: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm, overflow: 'hidden' },
@@ -470,6 +589,19 @@ const styles = StyleSheet.create({
   // View does, which was rendering as a blank/zero-size box.
   fullQrImage: { width: '85%', maxWidth: 420, aspectRatio: 1 },
   fullQrHint: { marginTop: 24, fontSize: 14, color: colors.textMuted },
+  fullQrCloseBtn: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  fullQrCloseBtnText: { fontSize: 18, fontWeight: '700', color: colors.text },
   footer: { flexDirection: 'row', gap: 8, paddingTop: 16 },
   cancelBtn: {
     flex: 1,

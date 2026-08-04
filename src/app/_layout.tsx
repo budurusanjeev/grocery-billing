@@ -51,6 +51,10 @@ export default function RootLayout() {
               name="payment-qr"
               options={{ headerTitle: () => <Header icon="📱" title="QR Codes" subtitle="UPI payment codes" /> }}
             />
+            <Stack.Screen
+              name="printer-setup"
+              options={{ headerTitle: () => <Header icon="🖨" title="Receipt Printer" subtitle="Bluetooth setup" /> }}
+            />
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="forgot-pin" options={{ headerShown: false }} />
             <Stack.Screen name="reset-pin" options={{ headerShown: false }} />

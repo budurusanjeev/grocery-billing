@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { getBills, type Bill } from '../lib/db';
+import { getBills, loadPrinter, type Bill } from '../lib/db';
 import { requireInternet } from '../lib/network';
+import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
 import { uploadBills } from '../lib/sync';
-import { cardShadow, colors, pressedDim, radius, ripple, spacing } from '../lib/theme';
+import { cardShadow, colors, isWeb, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 
 const PAYMENT_ICON: Record<string, string> = { cash: '💵', upi: '📱', card: '💳' };
@@ -23,6 +24,8 @@ export default function HistoryScreen() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const [printingSystemId, setPrintingSystemId] = useState<string | null>(null);
 
   useEffect(() => {
     getBills().then(setBills);
@@ -77,6 +80,33 @@ export default function HistoryScreen() {
       `Total: ${formatMoney(bill.total)}`,
     ].join('\n');
     Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
+  };
+
+  const printBill = async (bill: Bill) => {
+    const printer = await loadPrinter();
+    if (!printer) {
+      showMessage('No printer set up', 'Go to Payment → Receipt Printer Setup to connect one first.');
+      return;
+    }
+    setPrintingId(bill.id);
+    try {
+      await printBillReceipt(printer.address, bill, 'Kirana Bill');
+    } catch (e: any) {
+      showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
+    } finally {
+      setPrintingId(null);
+    }
+  };
+
+  const printBillSystem = async (bill: Bill) => {
+    setPrintingSystemId(bill.id);
+    try {
+      await printBillSystemDialog(bill, 'Kirana Bill');
+    } catch (e: any) {
+      showMessage('Could not print', e?.message ?? 'Something went wrong opening the print dialog.');
+    } finally {
+      setPrintingSystemId(null);
+    }
   };
 
   return (
@@ -180,6 +210,28 @@ export default function HistoryScreen() {
                     >
                       <Text style={styles.billShareBtnText}>📤 Share this bill on WhatsApp</Text>
                     </Pressable>
+                    {!isWeb && (
+                      <Pressable
+                        style={({ pressed }) => [styles.billPrintBtn, pressed && pressedDim]}
+                        android_ripple={ripple.onLight}
+                        onPress={() => printBill(bill)}
+                        disabled={printingId === bill.id}
+                      >
+                        <Text style={styles.billPrintBtnText}>
+                          {printingId === bill.id ? 'Printing…' : '🖨 Print (Bluetooth receipt printer)'}
+                        </Text>
+                      </Pressable>
+                    )}
+                    <Pressable
+                      style={({ pressed }) => [styles.billPrintSystemBtn, pressed && pressedDim]}
+                      android_ripple={ripple.onLight}
+                      onPress={() => printBillSystem(bill)}
+                      disabled={printingSystemId === bill.id}
+                    >
+                      <Text style={styles.billPrintSystemBtnText}>
+                        {printingSystemId === bill.id ? 'Opening print dialog…' : '🖶 Print (WiFi / Any Printer)'}
+                      </Text>
+                    </Pressable>
                   </View>
                 )}
               </Pressable>
@@ -265,4 +317,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   billShareBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  billPrintBtn: {
+    backgroundColor: colors.accentBlue,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  billPrintBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  billPrintSystemBtn: {
+    backgroundColor: colors.accentAmber,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  billPrintSystemBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 });

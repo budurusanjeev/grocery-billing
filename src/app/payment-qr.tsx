@@ -53,22 +53,37 @@ export default function PaymentQrScreen() {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images'],
       quality: 0.9,
+      base64: true,
+      allowsEditing: true,
+      aspect: [1, 1],
     };
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || !result.assets?.[0]?.uri) return;
 
-    // Downscale before storing — an unresized camera photo/screenshot can be
-    // several megapixels, which some Android devices fail to decode/render
-    // at larger on-screen sizes (works as a small thumbnail, goes blank at
-    // the bigger Pay-screen / full-screen size). A QR code needs very
-    // little resolution to stay scannable, so capping the width also keeps
-    // the cross-device sync payload small.
-    const resized = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 800 }).renderAsync();
-    const saved = await resized.saveAsync({ compress: 0.8, format: SaveFormat.JPEG, base64: true });
+    // TEMPORARY DIAGNOSTIC: bypass ImageManipulator entirely and use the
+    // picker's own cropped output directly, to isolate whether the resize
+    // step itself is producing a blank image.
+    const asset = result.assets[0];
+    if (asset.base64) {
+      const mimeType = asset.mimeType ?? 'image/jpeg';
+      console.log('RAW PICKED IMAGE len=', asset.base64.length, 'mime=', mimeType);
+      setPendingImage(`data:${mimeType};base64,${asset.base64}`);
+      return;
+    }
+
+    // Downscale after cropping — keeps the stored image small for fast
+    // rendering and a small cross-device sync payload. PNG, not JPEG: QR
+    // codes downloaded/shared directly from UPI apps (GPay's "Save QR" etc.)
+    // are commonly transparent-background PNGs, and JPEG can't represent
+    // transparency — flattening it during conversion was turning the whole
+    // image blank. PNG is also better suited to a QR code's sharp edges
+    // than JPEG's lossy compression.
+    const resized = await ImageManipulator.manipulate(asset.uri).resize({ width: 800 }).renderAsync();
+    const saved = await resized.saveAsync({ format: SaveFormat.PNG, base64: true });
     if (!saved.base64) return;
-    setPendingImage(`data:image/jpeg;base64,${saved.base64}`);
+    setPendingImage(`data:image/png;base64,${saved.base64}`);
   };
 
   const onSave = async () => {
@@ -103,7 +118,8 @@ export default function PaymentQrScreen() {
       <View style={styles.screen}>
         <Text style={styles.hint}>
           Save up to {MAX_QRCODES} UPI QR codes (GPay, PhonePe, bank, etc.) so you can quickly show
-          the right one at checkout. ({qrCodes.length}/{MAX_QRCODES})
+          the right one at checkout. Crop tightly to just the QR square when adding one — a full
+          app screenshot mostly shows blank white space at display size. ({qrCodes.length}/{MAX_QRCODES})
         </Text>
 
         <Pressable

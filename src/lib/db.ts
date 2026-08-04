@@ -66,9 +66,17 @@ export interface QrCode {
   imageUri: string;
 }
 
+// A shop has one receipt printer, not a list — unlike QR codes there's no
+// need to choose between several at checkout time.
+export interface PrinterDevice {
+  name: string;
+  address: string;
+}
+
 const ITEMS_KEY = 'gb_items_v1';
 const BILLS_KEY = 'gb_bills_v1';
 const QRCODES_KEY = 'gb_qrcodes_v1';
+const PRINTER_KEY = 'gb_printer_v1';
 export const MAX_QRCODES = 10;
 
 // AsyncStorage is used instead of sqlite so the exact same code runs on
@@ -161,4 +169,17 @@ export async function removeQrCode(id: string): Promise<QrCode[]> {
   const next = existing.filter((q) => q.id !== id);
   await AsyncStorage.setItem(QRCODES_KEY, JSON.stringify(next));
   return next;
+}
+
+export async function loadPrinter(): Promise<PrinterDevice | null> {
+  const raw = await AsyncStorage.getItem(PRINTER_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function savePrinter(printer: PrinterDevice): Promise<void> {
+  await AsyncStorage.setItem(PRINTER_KEY, JSON.stringify(printer));
+}
+
+export async function forgetPrinter(): Promise<void> {
+  await AsyncStorage.removeItem(PRINTER_KEY);
 }
