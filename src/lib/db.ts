@@ -56,6 +56,10 @@ export interface Bill {
   // Rupee amount knocked off the subtotal (0 if none) — stored so history
   // and receipts can show the breakdown without recomputing it later.
   discount?: number;
+  // Optional — collected at checkout for the receipt/records, not required
+  // to complete a sale.
+  customerName?: string;
+  customerMobile?: string;
 }
 
 export interface QrCode {
@@ -118,21 +122,25 @@ export async function addItem(item: Item): Promise<Item[]> {
   return next;
 }
 
-export async function saveBill(
-  lines: BillLine[],
-  total: number,
-  paymentMethod?: PaymentMethod,
-  customerType?: CustomerType,
-  discount?: number,
-): Promise<Bill> {
+export interface SaveBillOptions {
+  paymentMethod?: PaymentMethod;
+  customerType?: CustomerType;
+  discount?: number;
+  customerName?: string;
+  customerMobile?: string;
+}
+
+export async function saveBill(lines: BillLine[], total: number, options: SaveBillOptions = {}): Promise<Bill> {
   const bill: Bill = {
     id: `${Date.now()}`,
     created_at: new Date().toISOString(),
     lines,
     total,
-    paymentMethod,
-    customerType,
-    discount,
+    paymentMethod: options.paymentMethod,
+    customerType: options.customerType,
+    discount: options.discount,
+    customerName: options.customerName?.trim() || undefined,
+    customerMobile: options.customerMobile?.trim() || undefined,
   };
   const raw = await AsyncStorage.getItem(BILLS_KEY);
   const bills: Bill[] = raw ? JSON.parse(raw) : [];

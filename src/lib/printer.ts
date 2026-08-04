@@ -126,9 +126,11 @@ function sendReceipt(client: PrinterClient, bill: Bill, shopName: string): void 
     minute: '2-digit',
   });
 
-  client.printText(
-    `${TXT_BOLD_ON}${TXT_2HEIGHT}${centerLine(shopName)}${TXT_NORMAL}${TXT_BOLD_OFF}${centerLine(time)}${divider}`,
-  );
+  let header = `${TXT_BOLD_ON}${TXT_2HEIGHT}${centerLine(shopName)}${TXT_NORMAL}${TXT_BOLD_OFF}${centerLine(time)}`;
+  if (bill.customerName) header += centerLine(`Customer: ${bill.customerName}`);
+  if (bill.customerMobile) header += centerLine(`Mobile: ${bill.customerMobile}`);
+  header += divider;
+  client.printText(header);
 
   const nameWidth = PAPER_COLUMNS - 14;
   const amountColumns = (label: string, qty: string, amount: string, style = '') =>
@@ -232,11 +234,14 @@ function buildReceiptHtml(bill: Bill, shopName: string): string {
           .totals .value { text-align: right; }
           .grand-total td { font-size: 20px; font-weight: 800; border-top: 2px solid #0f172a; padding-top: 10px; }
           .footer { text-align: center; margin-top: 28px; color: #64748b; font-size: 13px; }
+          .customer { text-align: center; color: #334155; font-size: 13px; margin-bottom: 4px; }
         </style>
       </head>
       <body>
         <h1>${escapeHtml(shopName)}</h1>
         <div class="subtitle">${time}</div>
+        ${bill.customerName ? `<div class="customer">Customer: ${escapeHtml(bill.customerName)}</div>` : ''}
+        ${bill.customerMobile ? `<div class="customer">Mobile: ${escapeHtml(bill.customerMobile)}</div>` : ''}
         <table>
           <thead>
             <tr><th>Item</th><th class="center">Qty</th><th class="right">Rate</th><th class="right">Amount</th></tr>

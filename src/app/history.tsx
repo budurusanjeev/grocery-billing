@@ -71,6 +71,8 @@ export default function HistoryScreen() {
     });
     const text = [
       `Kirana Bill — ${time}`,
+      ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
+      ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
       ...bill.lines.map(
         (l) => `${l.name} — ${l.qty} ${l.unit} × ${formatMoney(l.price)} = ${formatMoney(l.price * l.qty)}`,
       ),
@@ -174,7 +176,10 @@ export default function HistoryScreen() {
               >
                 <View style={styles.billRow}>
                   <View>
-                    <Text style={styles.billTime}>{time}</Text>
+                    <Text style={styles.billTime}>
+                      {time}
+                      {bill.customerName ? ` · ${bill.customerName}` : ''}
+                    </Text>
                     <Text style={styles.billMeta}>
                       {bill.lines.length} items
                       {bill.paymentMethod ? ` · ${PAYMENT_ICON[bill.paymentMethod] ?? ''} ${bill.paymentMethod.toUpperCase()}` : ''}

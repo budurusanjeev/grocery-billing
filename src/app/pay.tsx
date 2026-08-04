@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { loadPrinter, loadQrCodes, saveBill, type Bill, type PaymentMethod, type QrCode } from '../lib/db';
 import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
@@ -30,6 +30,8 @@ export default function PayScreen() {
   // clearing, so the success screen doesn't show ₹0.
   const [paidAmount, setPaidAmount] = useState(0);
   const [paidBill, setPaidBill] = useState<Bill | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerMobile, setCustomerMobile] = useState('');
 
   useEffect(() => {
     if (method === 'upi') {
@@ -50,11 +52,19 @@ export default function PayScreen() {
     }
     setSaving(true);
     try {
-      const bill = await saveBill(lines, total, method, customerType, discount);
+      const bill = await saveBill(lines, total, {
+        paymentMethod: method,
+        customerType,
+        discount,
+        customerName,
+        customerMobile,
+      });
       setPaidBill(bill);
       const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
       const text = [
         'Kirana Bill',
+        ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
+        ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
         ...lines.map(
           (l) => `${l.name} — ${l.qty} ${l.unit} × ${formatMoney(l.price)} = ${formatMoney(l.price * l.qty)}`,
         ),
@@ -69,6 +79,8 @@ export default function PayScreen() {
       ].join('\n');
       setPaidAmount(total);
       clear();
+      setCustomerName('');
+      setCustomerMobile('');
       // Sharing is optional — show a dedicated button instead of forcing a
       // decision via a popup right after payment.
       setPaidText(text);
@@ -176,6 +188,29 @@ export default function PayScreen() {
         )}
       </View>
       <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+    </View>
+  );
+
+  const customerFieldsEl = (
+    <View style={styles.customerFields}>
+      <Text style={styles.sectionLabel}>Customer details (optional)</Text>
+      <View style={styles.customerRow}>
+        <TextInput
+          style={[styles.customerInput, styles.customerInputName]}
+          placeholder="Name"
+          placeholderTextColor={colors.textFaint}
+          value={customerName}
+          onChangeText={setCustomerName}
+        />
+        <TextInput
+          style={[styles.customerInput, styles.customerInputMobile]}
+          placeholder="Mobile number"
+          placeholderTextColor={colors.textFaint}
+          keyboardType="phone-pad"
+          value={customerMobile}
+          onChangeText={setCustomerMobile}
+        />
+      </View>
     </View>
   );
 
@@ -357,6 +392,7 @@ export default function PayScreen() {
         <View style={styles.controlsPanel}>
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {totalBarEl}
+            {customerFieldsEl}
             {methodRowEl}
             {qrSectionEl}
           </ScrollView>
@@ -398,6 +434,7 @@ export default function PayScreen() {
             the footer (Cancel/Confirm) off-screen with no way to reach them. */}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {totalBarEl}
+          {customerFieldsEl}
           {methodRowEl}
           {qrSectionEl}
         </ScrollView>
@@ -524,6 +561,19 @@ const styles = StyleSheet.create({
   totalValue: { color: '#ffffff', fontSize: 30, fontWeight: '800' },
   discountHint: { color: colors.brandLight, fontSize: 12, marginTop: 2 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginTop: 16, marginBottom: 8 },
+  customerFields: { marginTop: 4 },
+  customerRow: { flexDirection: 'row', gap: 8 },
+  customerInput: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  customerInputName: { flex: 1 },
+  customerInputMobile: { flex: 1 },
   methodRow: { flexDirection: 'row', gap: 8 },
   methodChip: {
     flex: 1,
