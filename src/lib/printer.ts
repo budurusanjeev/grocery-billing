@@ -5,6 +5,8 @@ import {
   COMMANDS,
   ColumnAlignment,
   NetPrinter,
+  NetPrinterEventEmitter,
+  RN_THERMAL_RECEIPT_PRINTER_EVENTS,
   type IBLEPrinter,
   type INetPrinter,
 } from 'react-native-thermal-receipt-printer-image-qr';
@@ -62,10 +64,36 @@ export async function listPairedPrinters(): Promise<IBLEPrinter[]> {
 // Scans the local WiFi subnet for printers listening on the raw print port
 // — can take a while (tens of seconds) since it has to probe the whole
 // range. The phone and printer must be on the same WiFi network.
+//
+// NetPrinter.getDeviceList()'s own returned Promise is unusable — the
+// native Android side (RNNetPrinterModule#getDeviceList) invokes its
+// success callback with no arguments and always returns an empty list
+// synchronously; the actual scan runs on a background thread and reports
+// results later via the "scannerResolved" native event instead. So the
+// scan has to be kicked off by calling getDeviceList() (ignoring what it
+// resolves with) while listening for that event for the real results.
 export async function scanNetworkPrinters(): Promise<INetPrinter[]> {
   if (isWeb) throw new Error(NOT_AVAILABLE_ON_WEB);
   await NetPrinter.init();
-  return NetPrinter.getDeviceList();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      subscription.remove();
+      reject(new Error('Scan timed out — no response from the network within 30 seconds.'));
+    }, 30000);
+    const subscription = NetPrinterEventEmitter.addListener(
+      RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNED_SUCCESS,
+      (devices: INetPrinter[]) => {
+        clearTimeout(timeout);
+        subscription.remove();
+        resolve(devices ?? []);
+      },
+    );
+    NetPrinter.getDeviceList().catch((err) => {
+      clearTimeout(timeout);
+      subscription.remove();
+      reject(err);
+    });
+  });
 }
 
 // Connects as a one-off check (used by the printer setup screen to confirm
