@@ -86,12 +86,12 @@ export default function PayScreen() {
     if (!paidBill) return;
     const printer = await loadPrinter();
     if (!printer) {
-      showMessage('No printer set up', 'Go to Printer Setup to connect a Bluetooth receipt printer first.');
+      showMessage('No printer set up', 'Go to Receipt Printer Setup to connect a printer first.');
       return;
     }
     setPrinting(true);
     try {
-      await printBillReceipt(printer.address, paidBill, 'Kirana Bill');
+      await printBillReceipt(printer, paidBill, 'Kirana Bill');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
     } finally {
@@ -138,7 +138,7 @@ export default function PayScreen() {
               onPress={onPrint}
               disabled={printing}
             >
-              <Text style={styles.printBtnText}>{printing ? 'Printing…' : '🖨 Print Receipt (Bluetooth)'}</Text>
+              <Text style={styles.printBtnText}>{printing ? 'Printing…' : '🖨 Print Receipt'}</Text>
             </Pressable>
           )}
 

@@ -2,52 +2,85 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { forgetPrinter, loadPrinter, savePrinter, type PrinterDevice } from '../lib/db';
-import { connectPrinter, listPairedPrinters, type IBLEPrinter } from '../lib/printer';
+import { listPairedPrinters, scanNetworkPrinters, testConnectPrinter } from '../lib/printer';
 import { cardShadow, colors, isWeb, pressedDim, radius, ripple } from '../lib/theme';
 import { confirmDialog, showMessage } from '../lib/ui';
 
+// A key that uniquely identifies a scanned device, used for React keys and
+// for comparing against the currently-saved printer.
+function deviceKey(d: PrinterDevice): string {
+  return d.type === 'bluetooth' ? `ble:${d.address}` : `net:${d.host}:${d.port}`;
+}
+
 export default function PrinterSetupScreen() {
   const [printer, setPrinter] = useState<PrinterDevice | null>(null);
-  const [devices, setDevices] = useState<IBLEPrinter[]>([]);
-  const [scanning, setScanning] = useState(false);
-  const [connectingAddress, setConnectingAddress] = useState<string | null>(null);
-  const [scanned, setScanned] = useState(false);
+  const [devices, setDevices] = useState<PrinterDevice[]>([]);
+  const [scanningBluetooth, setScanningBluetooth] = useState(false);
+  const [scanningNetwork, setScanningNetwork] = useState(false);
+  const [connectingKey, setConnectingKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadPrinter().then(setPrinter);
   }, []);
 
-  const onScan = async () => {
-    setScanning(true);
+  const onScanBluetooth = async () => {
+    setScanningBluetooth(true);
     try {
       const list = await listPairedPrinters();
-      setDevices(list);
-      setScanned(true);
-      if (list.length === 0) {
+      const found: PrinterDevice[] = list.map((d) => ({
+        type: 'bluetooth',
+        name: d.device_name || 'Unnamed device',
+        address: d.inner_mac_address,
+      }));
+      setDevices((prev) => [...prev.filter((d) => d.type !== 'bluetooth'), ...found]);
+      if (found.length === 0) {
         showMessage(
           'No paired printers found',
-          'Pair your receipt printer with this phone first, in Android Settings → Bluetooth, then come back and scan again.',
+          'Pair your receipt printer with this phone first, in Android Settings → Bluetooth, then scan again.',
         );
       }
     } catch (e: any) {
-      showMessage('Could not scan for printers', e?.message ?? 'Something went wrong.');
+      showMessage('Could not scan for Bluetooth printers', e?.message ?? 'Something went wrong.');
     } finally {
-      setScanning(false);
+      setScanningBluetooth(false);
     }
   };
 
-  const onSelect = async (device: IBLEPrinter) => {
-    setConnectingAddress(device.inner_mac_address);
+  const onScanNetwork = async () => {
+    setScanningNetwork(true);
     try {
-      await connectPrinter(device.inner_mac_address);
-      const saved: PrinterDevice = { name: device.device_name, address: device.inner_mac_address };
-      await savePrinter(saved);
-      setPrinter(saved);
-      showMessage('Printer connected', `"${device.device_name}" is now set as your receipt printer.`);
+      const list = await scanNetworkPrinters();
+      const found: PrinterDevice[] = list.map((d) => ({
+        type: 'network',
+        name: `Printer at ${d.host}`,
+        host: d.host,
+        port: d.port,
+      }));
+      setDevices((prev) => [...prev.filter((d) => d.type !== 'network'), ...found]);
+      if (found.length === 0) {
+        showMessage(
+          'No WiFi printers found',
+          'Make sure the printer and this phone are on the same WiFi network and the printer is turned on, then scan again.',
+        );
+      }
+    } catch (e: any) {
+      showMessage('Could not scan for WiFi printers', e?.message ?? 'Something went wrong.');
+    } finally {
+      setScanningNetwork(false);
+    }
+  };
+
+  const onSelect = async (device: PrinterDevice) => {
+    setConnectingKey(deviceKey(device));
+    try {
+      await testConnectPrinter(device);
+      await savePrinter(device);
+      setPrinter(device);
+      showMessage('Printer connected', `"${device.name}" is now set as your receipt printer.`);
     } catch (e: any) {
       showMessage('Could not connect', e?.message ?? 'Make sure the printer is turned on and nearby.');
     } finally {
-      setConnectingAddress(null);
+      setConnectingKey(null);
     }
   };
 
@@ -65,8 +98,8 @@ export default function PrinterSetupScreen() {
           <View style={styles.webNotice}>
             <Text style={styles.webNoticeIcon}>🖨</Text>
             <Text style={styles.webNoticeText}>
-              Receipt printing works on the Android app only — Bluetooth printers aren't available on
-              the web version.
+              Receipt printing works on the Android app only — Bluetooth/network printers aren't
+              available on the web version.
             </Text>
           </View>
         </View>
@@ -74,19 +107,24 @@ export default function PrinterSetupScreen() {
     );
   }
 
+  const isCurrent = (d: PrinterDevice) => printer && deviceKey(printer) === deviceKey(d);
+
   return (
     <ScreenContainer>
       <View style={styles.screen}>
         <Text style={styles.hint}>
-          Connect a Bluetooth receipt printer so you can print the final bill at checkout. Pair the
-          printer with this phone in Android Settings → Bluetooth first, then scan here.
+          Connect a receipt printer — Bluetooth (pair it with this phone in Android Settings →
+          Bluetooth first) or a WiFi printer on the same network as this phone.
         </Text>
 
         {printer && (
           <View style={styles.currentCard}>
             <View style={styles.currentInfo}>
               <Text style={styles.currentLabel}>Current printer</Text>
-              <Text style={styles.currentName}>{printer.name}</Text>
+              <Text style={styles.currentName}>
+                {printer.type === 'bluetooth' ? '🔵 ' : '🌐 '}
+                {printer.name}
+              </Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.forgetBtn, pressed && pressedDim]}
@@ -98,41 +136,59 @@ export default function PrinterSetupScreen() {
           </View>
         )}
 
-        <Pressable
-          style={({ pressed }) => [styles.scanBtn, pressed && pressedDim]}
-          android_ripple={ripple.onDark}
-          onPress={onScan}
-          disabled={scanning}
-        >
-          <Text style={styles.scanBtnText}>
-            {scanning ? 'Scanning…' : '🔍 Scan for Paired Printers'}
-          </Text>
-        </Pressable>
+        <View style={styles.scanRow}>
+          <Pressable
+            style={({ pressed }) => [styles.scanBtn, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={onScanBluetooth}
+            disabled={scanningBluetooth}
+          >
+            <Text style={styles.scanBtnText}>
+              {scanningBluetooth ? 'Scanning…' : '🔵 Scan Bluetooth'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.scanBtn, styles.scanBtnNetwork, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={onScanNetwork}
+            disabled={scanningNetwork}
+          >
+            <Text style={styles.scanBtnText}>{scanningNetwork ? 'Scanning…' : '🌐 Scan WiFi'}</Text>
+          </Pressable>
+        </View>
+        {scanningNetwork && (
+          <Text style={styles.scanningHint}>Scanning the WiFi network — this can take up to 30 seconds…</Text>
+        )}
 
-        {scanned && devices.length > 0 && (
+        {devices.length > 0 && (
           <View style={styles.deviceList}>
-            <Text style={styles.sectionLabel}>Paired Bluetooth devices</Text>
+            <Text style={styles.sectionLabel}>Found printers</Text>
             {devices.map((d) => {
-              const isCurrent = printer?.address === d.inner_mac_address;
-              const isConnecting = connectingAddress === d.inner_mac_address;
+              const key = deviceKey(d);
+              const connecting = connectingKey === key;
               return (
                 <Pressable
-                  key={d.inner_mac_address}
+                  key={key}
                   style={({ pressed }) => [
                     styles.deviceRow,
-                    isCurrent && styles.deviceRowActive,
+                    isCurrent(d) && styles.deviceRowActive,
                     pressed && pressedDim,
                   ]}
                   android_ripple={ripple.onLight}
                   onPress={() => onSelect(d)}
-                  disabled={isConnecting}
+                  disabled={connecting}
                 >
                   <View style={styles.deviceInfo}>
-                    <Text style={styles.deviceName}>{d.device_name || 'Unnamed device'}</Text>
-                    <Text style={styles.deviceAddress}>{d.inner_mac_address}</Text>
+                    <Text style={styles.deviceName}>
+                      {d.type === 'bluetooth' ? '🔵 ' : '🌐 '}
+                      {d.name}
+                    </Text>
+                    <Text style={styles.deviceAddress}>
+                      {d.type === 'bluetooth' ? d.address : `${d.host}:${d.port}`}
+                    </Text>
                   </View>
                   <Text style={styles.deviceStatus}>
-                    {isConnecting ? 'Connecting…' : isCurrent ? '✓ Selected' : 'Select'}
+                    {connecting ? 'Connecting…' : isCurrent(d) ? '✓ Selected' : 'Select'}
                   </Text>
                 </Pressable>
               );
@@ -164,7 +220,9 @@ const styles = StyleSheet.create({
   currentName: { fontSize: 16, fontWeight: '800', color: colors.brandDark, marginTop: 2 },
   forgetBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm, overflow: 'hidden' },
   forgetBtnText: { color: colors.accentRed, fontWeight: '700', fontSize: 13 },
+  scanRow: { flexDirection: 'row', gap: 8 },
   scanBtn: {
+    flex: 1,
     backgroundColor: colors.accentBlue,
     borderRadius: radius.md,
     paddingVertical: 14,
@@ -172,7 +230,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...cardShadow,
   },
-  scanBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  scanBtnNetwork: { backgroundColor: colors.accentPurple },
+  scanBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  scanningHint: { fontSize: 12, color: colors.textMuted, marginTop: 8, textAlign: 'center' },
   deviceList: { marginTop: 16 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginBottom: 8 },
   deviceRow: {

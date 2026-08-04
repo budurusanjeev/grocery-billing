@@ -67,11 +67,13 @@ export interface QrCode {
 }
 
 // A shop has one receipt printer, not a list — unlike QR codes there's no
-// need to choose between several at checkout time.
-export interface PrinterDevice {
-  name: string;
-  address: string;
-}
+// need to choose between several at checkout time. Either a Bluetooth
+// device (paired via Android Settings) or a WiFi/network printer
+// (discovered on the local subnet), both printed to via the same
+// ESC/POS-style formatting in src/lib/printer.ts.
+export type PrinterDevice =
+  | { type: 'bluetooth'; name: string; address: string }
+  | { type: 'network'; name: string; host: string; port: number };
 
 const ITEMS_KEY = 'gb_items_v1';
 const BILLS_KEY = 'gb_bills_v1';

@@ -4,19 +4,37 @@ import {
   BLEPrinter,
   COMMANDS,
   ColumnAlignment,
+  NetPrinter,
   type IBLEPrinter,
+  type INetPrinter,
 } from 'react-native-thermal-receipt-printer-image-qr';
-import { CUSTOMER_TYPES, type Bill } from './db';
+import { CUSTOMER_TYPES, type Bill, type PrinterDevice } from './db';
 import { isWeb } from './theme';
 import { formatMoney } from './ui';
 
-export type { IBLEPrinter };
+export type { IBLEPrinter, INetPrinter };
 
 // 58mm receipt printers (the common small counter printer) fit ~30
 // characters per line in the default font.
 const PAPER_COLUMNS = 30;
 
 const NOT_AVAILABLE_ON_WEB = 'Printing is not available on the web version — use the Android app.';
+
+// BLEPrinter and NetPrinter expose an identical set of print methods (only
+// how you connect to them differs) — this narrow shape is all the
+// receipt-formatting code below actually needs, so it can work against
+// either client without caring which it is.
+interface PrinterClient {
+  printText: (text: string, opts?: {}) => void;
+  printColumnsText: (
+    texts: string[],
+    columnWidth: number[],
+    columnAlignment: ColumnAlignment[],
+    columnStyle: string[],
+    opts?: {},
+  ) => void;
+  printBill: (text: string, opts?: { beep?: boolean; cut?: boolean }) => void;
+}
 
 // Android 12+ requires these as runtime-requested "nearby devices"
 // permissions, separate from the older BLUETOOTH/BLUETOOTH_ADMIN manifest
@@ -41,29 +59,36 @@ export async function listPairedPrinters(): Promise<IBLEPrinter[]> {
   return BLEPrinter.getDeviceList();
 }
 
+// Scans the local WiFi subnet for printers listening on the raw print port
+// — can take a while (tens of seconds) since it has to probe the whole
+// range. The phone and printer must be on the same WiFi network.
+export async function scanNetworkPrinters(): Promise<INetPrinter[]> {
+  if (isWeb) throw new Error(NOT_AVAILABLE_ON_WEB);
+  await NetPrinter.init();
+  return NetPrinter.getDeviceList();
+}
+
 // Connects as a one-off check (used by the printer setup screen to confirm
 // a picked device actually is a working printer before saving it).
-export async function connectPrinter(address: string): Promise<void> {
+export async function testConnectPrinter(device: PrinterDevice): Promise<void> {
   if (isWeb) throw new Error(NOT_AVAILABLE_ON_WEB);
-  await ensureBluetoothPermission();
-  await BLEPrinter.init();
-  await BLEPrinter.connectPrinter(address);
+  if (device.type === 'bluetooth') {
+    await ensureBluetoothPermission();
+    await BLEPrinter.init();
+    await BLEPrinter.connectPrinter(device.address);
+  } else {
+    await NetPrinter.init();
+    await NetPrinter.connectPrinter(device.host, device.port);
+  }
 }
 
 function centerLine(text: string): string {
   return `${COMMANDS.TEXT_FORMAT.TXT_ALIGN_CT}${text}${COMMANDS.TEXT_FORMAT.TXT_ALIGN_LT}\n`;
 }
 
-// Connects fresh each time rather than keeping a persistent connection —
-// Bluetooth links to cheap receipt printers drop easily, and reconnecting
-// right before every print is more reliable than assuming a stale
-// connection from earlier in the session is still good.
-export async function printBillReceipt(address: string, bill: Bill, shopName: string): Promise<void> {
-  if (isWeb) throw new Error(NOT_AVAILABLE_ON_WEB);
-  await ensureBluetoothPermission();
-  await BLEPrinter.init();
-  await BLEPrinter.connectPrinter(address);
-
+// The actual receipt formatting/sending — shared between Bluetooth and
+// network printers, since both clients expose the same print methods.
+function sendReceipt(client: PrinterClient, bill: Bill, shopName: string): void {
   const { TXT_BOLD_ON, TXT_BOLD_OFF, TXT_2HEIGHT, TXT_NORMAL } = COMMANDS.TEXT_FORMAT;
   const divider = `${'-'.repeat(PAPER_COLUMNS)}\n`;
   const time = new Date(bill.created_at).toLocaleString('en-IN', {
@@ -73,13 +98,13 @@ export async function printBillReceipt(address: string, bill: Bill, shopName: st
     minute: '2-digit',
   });
 
-  BLEPrinter.printText(
+  client.printText(
     `${TXT_BOLD_ON}${TXT_2HEIGHT}${centerLine(shopName)}${TXT_NORMAL}${TXT_BOLD_OFF}${centerLine(time)}${divider}`,
   );
 
   const nameWidth = PAPER_COLUMNS - 14;
   const amountColumns = (label: string, qty: string, amount: string, style = '') =>
-    BLEPrinter.printColumnsText(
+    client.printColumnsText(
       [label, qty, amount],
       [nameWidth, 6, 8],
       [ColumnAlignment.LEFT, ColumnAlignment.CENTER, ColumnAlignment.RIGHT],
@@ -91,10 +116,10 @@ export async function printBillReceipt(address: string, bill: Bill, shopName: st
     amountColumns(line.name, String(line.qty), formatMoney(line.price * line.qty));
   }
 
-  BLEPrinter.printText(divider);
+  client.printText(divider);
 
   const totalsColumns = (label: string, amount: string, style = '') =>
-    BLEPrinter.printColumnsText(
+    client.printColumnsText(
       [label, amount],
       [PAPER_COLUMNS - 10, 10],
       [ColumnAlignment.LEFT, ColumnAlignment.RIGHT],
@@ -106,14 +131,32 @@ export async function printBillReceipt(address: string, bill: Bill, shopName: st
     totalsColumns(`Discount (${label})`, `-${formatMoney(bill.discount)}`);
   }
   totalsColumns('TOTAL', formatMoney(bill.total), `${TXT_BOLD_ON}${TXT_2HEIGHT}`);
-  BLEPrinter.printText(TXT_NORMAL + TXT_BOLD_OFF);
+  client.printText(TXT_NORMAL + TXT_BOLD_OFF);
 
   let footer = '\n';
   if (bill.paymentMethod) {
     footer += centerLine(`Paid via ${bill.paymentMethod.toUpperCase()}`);
   }
   footer += centerLine('Thank you, visit again!');
-  BLEPrinter.printBill(footer, { beep: true, cut: true });
+  client.printBill(footer, { beep: true, cut: true });
+}
+
+// Connects fresh each time rather than keeping a persistent connection —
+// Bluetooth/network links to cheap receipt printers drop easily, and
+// reconnecting right before every print is more reliable than assuming a
+// stale connection from earlier in the session is still good.
+export async function printBillReceipt(device: PrinterDevice, bill: Bill, shopName: string): Promise<void> {
+  if (isWeb) throw new Error(NOT_AVAILABLE_ON_WEB);
+  if (device.type === 'bluetooth') {
+    await ensureBluetoothPermission();
+    await BLEPrinter.init();
+    await BLEPrinter.connectPrinter(device.address);
+    sendReceipt(BLEPrinter, bill, shopName);
+  } else {
+    await NetPrinter.init();
+    await NetPrinter.connectPrinter(device.host, device.port);
+    sendReceipt(NetPrinter, bill, shopName);
+  }
 }
 
 function escapeHtml(text: string): string {

@@ -90,7 +90,7 @@ export default function HistoryScreen() {
     }
     setPrintingId(bill.id);
     try {
-      await printBillReceipt(printer.address, bill, 'Kirana Bill');
+      await printBillReceipt(printer, bill, 'Kirana Bill');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
     } finally {
@@ -218,7 +218,7 @@ export default function HistoryScreen() {
                         disabled={printingId === bill.id}
                       >
                         <Text style={styles.billPrintBtnText}>
-                          {printingId === bill.id ? 'Printing…' : '🖨 Print (Bluetooth receipt printer)'}
+                          {printingId === bill.id ? 'Printing…' : '🖨 Print Receipt'}
                         </Text>
                       </Pressable>
                     )}
