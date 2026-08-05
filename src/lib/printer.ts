@@ -127,6 +127,7 @@ function sendReceipt(client: PrinterClient, bill: Bill, shopName: string): void 
   });
 
   let header = `${TXT_BOLD_ON}${TXT_2HEIGHT}${centerLine(shopName)}${TXT_NORMAL}${TXT_BOLD_OFF}${centerLine(time)}`;
+  if (bill.billNumber) header += centerLine(`Bill #${bill.billNumber}`);
   if (bill.customerName) header += centerLine(`Customer: ${bill.customerName}`);
   if (bill.customerMobile) header += centerLine(`Mobile: ${bill.customerMobile}`);
   header += divider;
@@ -239,7 +240,7 @@ function buildReceiptHtml(bill: Bill, shopName: string): string {
       </head>
       <body>
         <h1>${escapeHtml(shopName)}</h1>
-        <div class="subtitle">${time}</div>
+        <div class="subtitle">${time}${bill.billNumber ? ` · Bill #${escapeHtml(bill.billNumber)}` : ''}</div>
         ${bill.customerName ? `<div class="customer">Customer: ${escapeHtml(bill.customerName)}</div>` : ''}
         ${bill.customerMobile ? `<div class="customer">Mobile: ${escapeHtml(bill.customerMobile)}</div>` : ''}
         <table>

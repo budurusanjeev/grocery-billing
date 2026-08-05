@@ -60,6 +60,12 @@ export interface Bill {
   // to complete a sale.
   customerName?: string;
   customerMobile?: string;
+  // Human-readable receipt number: YYMM + a 3-digit counter that resets
+  // each month (e.g. "2608001" = the 1st bill in August 2026). Separate
+  // from `id`, which stays a timestamp-based string used as the actual
+  // storage/sync key — this is just what's shown to the customer. Optional
+  // because bills saved before this feature existed don't have one.
+  billNumber?: string;
 }
 
 export interface QrCode {
@@ -83,7 +89,21 @@ const ITEMS_KEY = 'gb_items_v1';
 const BILLS_KEY = 'gb_bills_v1';
 const QRCODES_KEY = 'gb_qrcodes_v1';
 const PRINTER_KEY = 'gb_printer_v1';
+const BILLNUM_KEY = 'gb_billnum_v1';
 export const MAX_QRCODES = 10;
+
+// YYMM + a 3-digit counter, resetting to 001 whenever the month changes —
+// e.g. "2608001" for the 1st bill in August 2026. Per-device: two phones
+// used by the same shop will each count independently from 001, so the
+// same number could appear on both if they're not the only device in use.
+async function nextBillNumber(date: Date): Promise<string> {
+  const yearMonth = `${String(date.getFullYear()).slice(-2)}${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const raw = await AsyncStorage.getItem(BILLNUM_KEY);
+  const state: { yearMonth: string; count: number } = raw ? JSON.parse(raw) : { yearMonth: '', count: 0 };
+  const count = state.yearMonth === yearMonth ? state.count + 1 : 1;
+  await AsyncStorage.setItem(BILLNUM_KEY, JSON.stringify({ yearMonth, count }));
+  return `${yearMonth}${String(count).padStart(3, '0')}`;
+}
 
 // AsyncStorage is used instead of sqlite so the exact same code runs on
 // Android and web (localStorage) with zero extra config. The catalog is
@@ -131,9 +151,10 @@ export interface SaveBillOptions {
 }
 
 export async function saveBill(lines: BillLine[], total: number, options: SaveBillOptions = {}): Promise<Bill> {
+  const now = new Date();
   const bill: Bill = {
     id: `${Date.now()}`,
-    created_at: new Date().toISOString(),
+    created_at: now.toISOString(),
     lines,
     total,
     paymentMethod: options.paymentMethod,
@@ -141,6 +162,7 @@ export async function saveBill(lines: BillLine[], total: number, options: SaveBi
     discount: options.discount,
     customerName: options.customerName?.trim() || undefined,
     customerMobile: options.customerMobile?.trim() || undefined,
+    billNumber: await nextBillNumber(now),
   };
   const raw = await AsyncStorage.getItem(BILLS_KEY);
   const bills: Bill[] = raw ? JSON.parse(raw) : [];

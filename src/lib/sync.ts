@@ -90,6 +90,16 @@ export async function fetchAndMergeNewItems(): Promise<SyncResult> {
   return { added: fresh.length, items: merged };
 }
 
+const LAST_UPLOAD_AT_KEY = 'gb_last_upload_at_v1';
+
+// Read by the History screen to show "not uploaded in N days" — set on
+// every successful uploadBills() call, whether triggered by the manual
+// button or the daily auto-upload, so both count toward "last synced."
+export async function getLastUploadAt(): Promise<Date | null> {
+  const raw = await AsyncStorage.getItem(LAST_UPLOAD_AT_KEY);
+  return raw ? new Date(raw) : null;
+}
+
 // Pushes every locally-saved bill (up to the last 200 kept on-device) up to
 // the server — via the dedicated button, or automatically once daily (see
 // maybeAutoUploadBills below). Safe to call repeatedly: the server upserts
@@ -104,6 +114,7 @@ export async function uploadBills(): Promise<{ uploaded: number }> {
 
   const bills = await getBills();
   if (bills.length === 0) {
+    await AsyncStorage.setItem(LAST_UPLOAD_AT_KEY, new Date().toISOString());
     return { uploaded: 0 };
   }
 
@@ -128,6 +139,7 @@ export async function uploadBills(): Promise<{ uploaded: number }> {
   }
 
   const body = await res.json();
+  await AsyncStorage.setItem(LAST_UPLOAD_AT_KEY, new Date().toISOString());
   return { uploaded: typeof body?.uploaded === 'number' ? body.uploaded : bills.length };
 }
 

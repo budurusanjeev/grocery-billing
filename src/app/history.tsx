@@ -3,7 +3,7 @@ import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-nati
 import { getBills, loadPrinter, type Bill } from '../lib/db';
 import { requireInternet } from '../lib/network';
 import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
-import { uploadBills } from '../lib/sync';
+import { getLastUploadAt, uploadBills } from '../lib/sync';
 import { cardShadow, colors, isWeb, pressedDim, radius, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 
@@ -26,10 +26,21 @@ export default function HistoryScreen() {
   const [uploading, setUploading] = useState(false);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printingSystemId, setPrintingSystemId] = useState<string | null>(null);
+  const [lastUploadAt, setLastUploadAt] = useState<Date | null>(null);
 
   useEffect(() => {
     getBills().then(setBills);
+    getLastUploadAt().then(setLastUploadAt);
   }, []);
+
+  const daysSinceUpload = useMemo(() => {
+    if (!lastUploadAt) return null;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfUploadDay = new Date(lastUploadAt);
+    startOfUploadDay.setHours(0, 0, 0, 0);
+    return Math.round((startOfToday.getTime() - startOfUploadDay.getTime()) / (24 * 60 * 60 * 1000));
+  }, [lastUploadAt]);
 
   const todaysBills = useMemo(() => bills.filter((b) => isToday(b.created_at)), [bills]);
   const totalRevenue = useMemo(() => todaysBills.reduce((sum, b) => sum + b.total, 0), [todaysBills]);
@@ -53,6 +64,7 @@ export default function HistoryScreen() {
     setUploading(true);
     try {
       const { uploaded } = await uploadBills();
+      setLastUploadAt(new Date());
       showMessage(
         'Upload complete',
         uploaded > 0 ? `Uploaded ${uploaded} payment(s) to the server.` : 'No payments to upload.',
@@ -70,7 +82,7 @@ export default function HistoryScreen() {
       minute: '2-digit',
     });
     const text = [
-      `Kirana Bill — ${time}`,
+      `Kirana Bill${bill.billNumber ? ` #${bill.billNumber}` : ''} — ${time}`,
       ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
       ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
       ...bill.lines.map(
@@ -140,6 +152,15 @@ export default function HistoryScreen() {
           </Pressable>
         )}
 
+        {(daysSinceUpload === null || daysSinceUpload > 0) && (
+          <Text style={styles.uploadWarning}>
+            ⚠{' '}
+            {daysSinceUpload === null
+              ? 'Never uploaded to the server yet'
+              : `Not uploaded in ${daysSinceUpload} day${daysSinceUpload > 1 ? 's' : ''}`}
+          </Text>
+        )}
+
         <Pressable
           style={({ pressed }) => [styles.uploadBtn, pressed && pressedDim]}
           android_ripple={ripple.onDark}
@@ -177,6 +198,7 @@ export default function HistoryScreen() {
                 <View style={styles.billRow}>
                   <View>
                     <Text style={styles.billTime}>
+                      {bill.billNumber ? `#${bill.billNumber} · ` : ''}
                       {time}
                       {bill.customerName ? ` · ${bill.customerName}` : ''}
                     </Text>
@@ -286,6 +308,16 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   uploadBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  uploadWarning: {
+    color: '#b45309',
+    backgroundColor: '#fef3c7',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    borderRadius: radius.sm,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
   list: { flex: 1, marginTop: 12 },
   listContent: { paddingBottom: spacing.listBottom },
   emptyBox: { alignItems: 'center', marginTop: 40 },

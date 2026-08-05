@@ -62,7 +62,7 @@ export default function PayScreen() {
       setPaidBill(bill);
       const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
       const text = [
-        'Kirana Bill',
+        `Kirana Bill${bill.billNumber ? ` #${bill.billNumber}` : ''}`,
         ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
         ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
         ...lines.map(
@@ -133,6 +133,7 @@ export default function PayScreen() {
             <Text style={styles.successIcon}>✓</Text>
             <Text style={styles.successTitle}>Payment Recorded</Text>
             <Text style={styles.successAmount}>{formatMoney(paidAmount)}</Text>
+            {paidBill?.billNumber && <Text style={styles.successBillNumber}>Bill #{paidBill.billNumber}</Text>}
           </View>
 
           <Pressable
@@ -509,6 +510,7 @@ const styles = StyleSheet.create({
   },
   successTitle: { fontSize: 20, fontWeight: '800', color: colors.brandDark },
   successAmount: { fontSize: 32, fontWeight: '800', color: colors.text },
+  successBillNumber: { fontSize: 13, color: colors.textMuted, fontWeight: '600', marginTop: 2 },
   shareBtn: {
     backgroundColor: '#25D366',
     borderRadius: radius.md,
