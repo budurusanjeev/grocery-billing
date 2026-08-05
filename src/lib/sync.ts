@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getBills,
   loadItems,
@@ -10,6 +11,7 @@ import {
   type Unit,
 } from './db';
 import { supabase } from './supabase';
+import { showMessage } from './ui';
 
 const ITEMS_URL = process.env.EXPO_PUBLIC_ITEMS_URL ?? 'http://localhost:5050/api/v1/items';
 const BILLS_URL = process.env.EXPO_PUBLIC_BILLS_URL ?? 'http://localhost:5050/api/v1/bills';
@@ -89,9 +91,9 @@ export async function fetchAndMergeNewItems(): Promise<SyncResult> {
 }
 
 // Pushes every locally-saved bill (up to the last 200 kept on-device) up to
-// the server, on demand via a dedicated button — never automatically. Safe
-// to tap repeatedly: the server upserts on the bill's own local id, so
-// re-uploading never creates duplicate rows.
+// the server — via the dedicated button, or automatically once daily (see
+// maybeAutoUploadBills below). Safe to call repeatedly: the server upserts
+// on the bill's own local id, so re-uploading never creates duplicate rows.
 export async function uploadBills(): Promise<{ uploaded: number }> {
   const {
     data: { session },
@@ -200,6 +202,45 @@ export async function syncQrCodes(): Promise<SyncResult<QrCode>> {
   const merged = [...local, ...fresh].slice(-MAX_QRCODES);
   await saveQrCodes(merged);
   return { added: fresh.length, items: merged };
+}
+
+const AUTO_UPLOAD_HOUR = 21; // 9 PM, local shop time
+const LAST_AUTO_UPLOAD_KEY = 'gb_last_auto_upload_date_v1';
+
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Opportunistic daily auto-upload, checked every time the app opens or
+// comes to the foreground. If it's past 9 PM local time and today's bills
+// haven't been auto-uploaded yet, upload them right then. This is
+// deliberately NOT a true background task — Android doesn't guarantee
+// exact-time execution for those without a native scheduler and extra
+// permissions, and battery optimization can delay them by hours anyway. So
+// instead: "next time the app happens to be open after 9 PM, upload today's
+// payments" — reliable, needs no new permissions, and the manual "Upload
+// All Payments" button is always there as a fallback.
+//
+// Silent on failure (offline, not logged in, etc.) so it never interrupts
+// just opening the app — nothing gets marked done until a successful
+// upload, so it naturally retries the next time the app opens.
+export async function maybeAutoUploadBills(): Promise<void> {
+  const now = new Date();
+  if (now.getHours() < AUTO_UPLOAD_HOUR) return;
+
+  const today = localDateKey(now);
+  const lastDone = await AsyncStorage.getItem(LAST_AUTO_UPLOAD_KEY);
+  if (lastDone === today) return;
+
+  try {
+    const { uploaded } = await uploadBills();
+    await AsyncStorage.setItem(LAST_AUTO_UPLOAD_KEY, today);
+    if (uploaded > 0) {
+      showMessage('Auto-upload complete', `${uploaded} payment(s) for today were uploaded automatically.`);
+    }
+  } catch {
+    // Offline, not logged in, server down, etc. — try again next app open.
+  }
 }
 
 // Best-effort: removes a QR code from the server too, so it doesn't come
