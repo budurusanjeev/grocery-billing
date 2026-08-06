@@ -30,6 +30,7 @@ export default function CatalogScreen() {
   const [newPrice, setNewPrice] = useState('');
   const [newUnit, setNewUnit] = useState<Unit>('kg');
   const [newNoDiscount, setNewNoDiscount] = useState(false);
+  const [savingNewItem, setSavingNewItem] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -183,31 +184,40 @@ export default function CatalogScreen() {
   };
 
   const onAddItem = async () => {
+    // Adding is an append, not an idempotent update — a fast double-tap
+    // before the form closes could otherwise create two near-identical
+    // catalog items.
+    if (savingNewItem) return;
     const price = parseFloat(newPrice);
     if (!newName.trim() || isNaN(price) || price <= 0) {
       showMessage('Missing details', 'Enter at least an item name and a valid price.');
       return;
     }
-    const id = `custom-${Date.now()}`;
-    const next = await addItem({
-      id,
-      name_en: newName.trim(),
-      name_te: newNameTe.trim(),
-      aliases: [newName.trim().toLowerCase()],
-      category: newCategory,
-      brand: newBrand.trim() || null,
-      unit: newUnit,
-      price,
-      noDiscount: newNoDiscount,
-    });
-    setItems(next);
-    setShowAdd(false);
-    setNewName('');
-    setNewNameTe('');
-    setNewBrand('');
-    setNewCategory('Custom');
-    setNewPrice('');
-    setNewNoDiscount(false);
+    setSavingNewItem(true);
+    try {
+      const id = `custom-${Date.now()}`;
+      const next = await addItem({
+        id,
+        name_en: newName.trim(),
+        name_te: newNameTe.trim(),
+        aliases: [newName.trim().toLowerCase()],
+        category: newCategory,
+        brand: newBrand.trim() || null,
+        unit: newUnit,
+        price,
+        noDiscount: newNoDiscount,
+      });
+      setItems(next);
+      setShowAdd(false);
+      setNewName('');
+      setNewNameTe('');
+      setNewBrand('');
+      setNewCategory('Custom');
+      setNewPrice('');
+      setNewNoDiscount(false);
+    } finally {
+      setSavingNewItem(false);
+    }
   };
 
   const onFetchNewItems = async () => {
@@ -371,8 +381,9 @@ export default function CatalogScreen() {
               style={({ pressed }) => [styles.saveBtn, pressed && pressedDim]}
               android_ripple={ripple.onDark}
               onPress={onAddItem}
+              disabled={savingNewItem}
             >
-              <Text style={styles.saveBtnText}>Save Item</Text>
+              <Text style={styles.saveBtnText}>{savingNewItem ? 'Saving…' : 'Save Item'}</Text>
             </Pressable>
           </View>
         )}

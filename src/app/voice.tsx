@@ -95,6 +95,10 @@ export default function VoiceScreen() {
     const misses: string[] = [];
     const added: string[] = [];
     for (const entry of entries) {
+      // A stray digit the recognizer transcribes as a literal "0" would
+      // otherwise add a line with zero quantity that never contributes to
+      // the total but sits there cluttering the bill until removed by hand.
+      if (entry.qty <= 0) continue;
       const item = matchItem(entry.query, itemsRef.current);
       if (item) {
         addLine(item, entry.qty);

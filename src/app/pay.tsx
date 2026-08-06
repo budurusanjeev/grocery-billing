@@ -42,6 +42,11 @@ export default function PayScreen() {
   }, [method]);
 
   const finish = async () => {
+    // Function-level guard, not just the button's disabled prop — a fast
+    // double-tap/double-click can fire onPress twice before React re-renders
+    // the disabled state, which would otherwise save the same sale as two
+    // separate bills.
+    if (saving) return;
     if (lines.length === 0) {
       showMessage('Empty bill', 'Nothing to pay for.');
       return;

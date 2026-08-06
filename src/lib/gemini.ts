@@ -37,5 +37,14 @@ export async function parseGroceryPhoto(base64: string, mimeType: string): Promi
 
   const data = await res.json();
   const items = Array.isArray(data?.items) ? (data.items as ScannedItem[]) : [];
-  return items.filter((row) => row && typeof row.name === 'string' && row.name.trim());
+  // Gemini's JSON output isn't guaranteed to have a valid qty — a missing,
+  // zero, or malformed value would otherwise flow straight into a bill line
+  // and silently turn the total into "₹NaN". Default to 1 rather than drop
+  // the row entirely, since the item itself was still read correctly.
+  return items
+    .filter((row) => row && typeof row.name === 'string' && row.name.trim())
+    .map((row) => ({
+      ...row,
+      qty: typeof row.qty === 'number' && row.qty > 0 ? row.qty : 1,
+    }));
 }
