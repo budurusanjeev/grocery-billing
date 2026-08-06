@@ -117,16 +117,27 @@ export async function setDeviceLabel(label: string): Promise<void> {
 // device label set via setDeviceLabel is appended (e.g. "2604001-PC" vs
 // "2604001-Phone1") so numbers from different devices can never collide.
 // No label set (the common single-device case) means no suffix at all.
-async function nextBillNumber(date: Date): Promise<string> {
+//
+// Pure formatting, no storage access — split out so it can be unit-tested
+// directly instead of only through the AsyncStorage-backed counter below.
+export function formatBillNumber(date: Date, count: number, deviceLabel: string): string {
   const yy = String(date.getFullYear()).slice(-2);
   const dd = String(date.getDate()).padStart(2, '0');
-  const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  return `${yy}${dd}${String(count).padStart(3, '0')}${deviceLabel ? `-${deviceLabel}` : ''}`;
+}
+
+function billDayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+async function nextBillNumber(date: Date): Promise<string> {
+  const dayKey = billDayKey(date);
   const raw = await AsyncStorage.getItem(BILLNUM_KEY);
   const state: { dayKey: string; count: number } = raw ? JSON.parse(raw) : { dayKey: '', count: 0 };
   const count = state.dayKey === dayKey ? state.count + 1 : 1;
   await AsyncStorage.setItem(BILLNUM_KEY, JSON.stringify({ dayKey, count }));
   const label = await getDeviceLabel();
-  return `${yy}${dd}${String(count).padStart(3, '0')}${label ? `-${label}` : ''}`;
+  return formatBillNumber(date, count, label);
 }
 
 // AsyncStorage is used instead of sqlite so the exact same code runs on

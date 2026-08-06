@@ -15,6 +15,7 @@ npx expo start --web      # web only
 npx expo export -p web    # static web build into dist/
 npx expo run:android      # local Android dev build (needed for voice — see below)
 npx tsc --noEmit          # typecheck
+npm test                  # Jest — pure-logic unit tests only (billMath, bill numbering, voice parser)
 
 cd server && npm install  # once, for the scan backend
 node server/index.js      # run the scan backend locally (port 5050; reads server/.env)
@@ -28,7 +29,8 @@ node server/index.js      # run the scan backend locally (port 5050; reads serve
 
 Routes live in `src/app/` (expo-router): `index` (billing), `catalog`, `scan`, `voice`. Everything else is in `src/lib`, `src/state`, `src/catalog`.
 
-- **Bill state** (`src/state/bill.tsx`): React context; the in-progress bill only. Adding an item that's already on the bill increments its qty rather than duplicating the line.
+- **Bill state** (`src/state/bill.tsx`): React context; the in-progress bill only. Adding an item that's already on the bill increments its qty rather than duplicating the line. The actual subtotal/discount/total math lives in `src/lib/billMath.ts` as a plain function (`computeBillTotals`), pulled out specifically so it's unit-testable without rendering the provider — see `src/lib/__tests__/`.
+- **Tests** (`src/lib/__tests__/`): Jest (`jest-expo` preset) covers pure logic only — bill math, bill-number formatting, the voice parser. No component/integration tests yet. `jest.setup.js` mocks AsyncStorage (via the library's own official mock) since `db.ts` touches it at import time and plain Jest has no native module to back it.
 - **Storage** (`src/lib/db.ts`): AsyncStorage (not sqlite) — deliberate, so identical code runs on Android and web with zero config; the catalog is ~100 rows. On first run the catalog seeds from `src/catalog/seed.json`. All persistence goes through this file, so a future move to sqlite/Supabase touches only `db.ts`.
 - **Seed catalog** (`src/catalog/seed.json`): ~100 Telangana groceries. Every item carries `name_te` (Telugu script) and `aliases` (Roman transliterations like "kandi pappu", "biyyam") — **these aliases are what make voice and scan matching work**; when adding items, always include the transliterations people actually say.
 - **Matching** (`src/lib/matcher.ts`): fuse.js fuzzy search over name_en/name_te/aliases/brand. Used by the search box, the scan flow, and the voice flow — one matcher for all three.
