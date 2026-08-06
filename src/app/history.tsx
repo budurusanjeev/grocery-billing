@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getBills, loadPrinter, type Bill } from '../lib/db';
 import { requireInternet } from '../lib/network';
 import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
 import { getLastUploadAt, uploadBills } from '../lib/sync';
-import { cardShadow, colors, isWeb, pressedDim, radius, ripple, spacing } from '../lib/theme';
+import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple, spacing } from '../lib/theme';
 import { formatMoney, showMessage } from '../lib/ui';
 
 const PAYMENT_ICON: Record<string, string> = { cash: '💵', upi: '📱', card: '💳' };
@@ -165,87 +165,89 @@ export default function HistoryScreen() {
     }
   };
 
-  return (
+  const controlsEl = (
     <>
-      <View style={styles.screen}>
-        <View style={styles.dateNavRow}>
-          <Pressable
-            style={({ pressed }) => [styles.dateNavBtn, !hasPreviousDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
-            android_ripple={ripple.onLight}
-            onPress={goToPreviousDay}
-            disabled={!hasPreviousDay}
-          >
-            <Text style={styles.dateNavBtnText}>◀</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dateLabelBtn, pressed && pressedDim]}
-            android_ripple={ripple.onLight}
-            onPress={() => setPickerOpen(true)}
-          >
-            <Text style={styles.dateLabelText}>
-              {isToday
-                ? 'Today'
-                : selectedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </Text>
-            <Text style={styles.dateLabelHint}>📅 change</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.dateNavBtn, !hasNextDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
-            android_ripple={ripple.onLight}
-            onPress={goToNextDay}
-            disabled={!hasNextDay}
-          >
-            <Text style={styles.dateNavBtnText}>▶</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{dayBills.length}</Text>
-            <Text style={styles.summaryLabel}>Bills</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{totalItems}</Text>
-            <Text style={styles.summaryLabel}>Items sold</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{formatMoney(totalRevenue)}</Text>
-            <Text style={styles.summaryLabel}>Total sales</Text>
-          </View>
-        </View>
-
-        {dayBills.length > 0 && (
-          <Pressable
-            style={({ pressed }) => [styles.shareBtn, pressed && pressedDim]}
-            android_ripple={ripple.onDark}
-            onPress={shareDaySummary}
-          >
-            <Text style={styles.shareBtnText}>📤 Share Day Summary on WhatsApp</Text>
-          </Pressable>
-        )}
-
-        {(daysSinceUpload === null || daysSinceUpload > 0) && (
-          <Text style={styles.uploadWarning}>
-            ⚠{' '}
-            {daysSinceUpload === null
-              ? 'Never uploaded to the server yet'
-              : `Not uploaded in ${daysSinceUpload} day${daysSinceUpload > 1 ? 's' : ''}`}
-          </Text>
-        )}
-
+      <View style={styles.dateNavRow}>
         <Pressable
-          style={({ pressed }) => [styles.uploadBtn, pressed && pressedDim]}
-          android_ripple={ripple.onDark}
-          onPress={onUploadAll}
-          disabled={uploading}
+          style={({ pressed }) => [styles.dateNavBtn, !hasPreviousDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={goToPreviousDay}
+          disabled={!hasPreviousDay}
         >
-          <Text style={styles.uploadBtnText}>
-            {uploading ? 'Uploading…' : '☁ Upload All Payments to Server'}
-          </Text>
+          <Text style={styles.dateNavBtnText}>◀</Text>
         </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.dateLabelBtn, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={() => setPickerOpen(true)}
+        >
+          <Text style={styles.dateLabelText}>
+            {isToday
+              ? 'Today'
+              : selectedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </Text>
+          <Text style={styles.dateLabelHint}>📅 change</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.dateNavBtn, !hasNextDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
+          android_ripple={ripple.onLight}
+          onPress={goToNextDay}
+          disabled={!hasNextDay}
+        >
+          <Text style={styles.dateNavBtnText}>▶</Text>
+        </Pressable>
+      </View>
 
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryValue}>{dayBills.length}</Text>
+          <Text style={styles.summaryLabel}>Bills</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryValue}>{totalItems}</Text>
+          <Text style={styles.summaryLabel}>Items sold</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryStat}>
+          <Text style={styles.summaryValue}>{formatMoney(totalRevenue)}</Text>
+          <Text style={styles.summaryLabel}>Total sales</Text>
+        </View>
+      </View>
+
+      {dayBills.length > 0 && (
+        <Pressable
+          style={({ pressed }) => [styles.shareBtn, pressed && pressedDim]}
+          android_ripple={ripple.onDark}
+          onPress={shareDaySummary}
+        >
+          <Text style={styles.shareBtnText}>📤 Share Day Summary on WhatsApp</Text>
+        </Pressable>
+      )}
+
+      {(daysSinceUpload === null || daysSinceUpload > 0) && (
+        <Text style={styles.uploadWarning}>
+          ⚠{' '}
+          {daysSinceUpload === null
+            ? 'Never uploaded to the server yet'
+            : `Not uploaded in ${daysSinceUpload} day${daysSinceUpload > 1 ? 's' : ''}`}
+        </Text>
+      )}
+
+      <Pressable
+        style={({ pressed }) => [styles.uploadBtn, pressed && pressedDim]}
+        android_ripple={ripple.onDark}
+        onPress={onUploadAll}
+        disabled={uploading}
+      >
+        <Text style={styles.uploadBtnText}>
+          {uploading ? 'Uploading…' : '☁ Upload All Payments to Server'}
+        </Text>
+      </Pressable>
+    </>
+  );
+
+  const billListEl = (
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
@@ -339,8 +341,9 @@ export default function HistoryScreen() {
             );
           }}
         />
-      </View>
+  );
 
+  const pickerModal = (
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <Pressable style={styles.pickerBackdrop} onPress={() => setPickerOpen(false)}>
           <View style={styles.pickerSheet}>
@@ -381,6 +384,31 @@ export default function HistoryScreen() {
           </View>
         </Pressable>
       </Modal>
+  );
+
+  if (isWeb) {
+    return (
+      <>
+        <View style={styles.page}>
+          <View style={styles.controlsPanel}>
+            <ScrollView style={styles.controlsScroll} contentContainerStyle={styles.controlsScrollContent}>
+              {controlsEl}
+            </ScrollView>
+          </View>
+          <View style={styles.listPanel}>{billListEl}</View>
+        </View>
+        {pickerModal}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.screen}>
+        {controlsEl}
+        {billListEl}
+      </View>
+      {pickerModal}
     </>
   );
 }
@@ -392,6 +420,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: spacing.listBottom,
+  },
+  // Web-only two-panel layout: date nav/summary/share/upload controls on
+  // the left, the scrollable bill list on the right — mirrors the
+  // two-panel pattern used on the Billing, Voice, and Payment screens.
+  page: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.bg,
+    padding: 12,
+    gap: 12,
+  },
+  controlsPanel: {
+    width: '38%',
+    maxWidth: 380,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    ...raisedShadow,
+  },
+  controlsScroll: { flex: 1 },
+  controlsScrollContent: { padding: 16 },
+  listPanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 12,
+    ...raisedShadow,
   },
   dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   dateNavBtn: {
