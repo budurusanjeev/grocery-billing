@@ -43,7 +43,8 @@
           "imageWidth": 140
         }
       ],
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

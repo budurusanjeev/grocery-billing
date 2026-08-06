@@ -16,7 +16,8 @@
         "EXPO_PUBLIC_QRCODES_URL": "https://grocery-billing-server.onrender.com/api/v1/qrcodes",
         "EXPO_PUBLIC_SUPABASE_URL": "https://flqwurfvryzifwfuyybm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9",
-        "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin"
+        "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://062dc0b04874ff0e160de55e6411207c@o4511862009692160.ingest.us.sentry.io/4511862019063808"
       }
     },
     "production": {
@@ -31,7 +32,8 @@
         "EXPO_PUBLIC_QRCODES_URL": "https://grocery-billing-server.onrender.com/api/v1/qrcodes",
         "EXPO_PUBLIC_SUPABASE_URL": "https://flqwurfvryzifwfuyybm.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9",
-        "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin"
+        "EXPO_PUBLIC_RESET_PIN_URL": "grocerybilling://reset-pin",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://062dc0b04874ff0e160de55e6411207c@o4511862009692160.ingest.us.sentry.io/4511862019063808"
       }
     }
   },
