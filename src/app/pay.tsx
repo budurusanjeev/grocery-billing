@@ -235,15 +235,15 @@ export default function PayScreen() {
           </Pressable>
         ))}
       </View>
-      {!isWeb && (
-        <Pressable
-          style={({ pressed }) => [styles.printerSetupLink, pressed && pressedDim]}
-          android_ripple={ripple.onLight}
-          onPress={() => router.push('/printer-setup')}
-        >
-          <Text style={styles.printerSetupLinkText}>🖨 Receipt Printer Setup</Text>
-        </Pressable>
-      )}
+      <Pressable
+        style={({ pressed }) => [styles.printerSetupLink, pressed && pressedDim]}
+        android_ripple={ripple.onLight}
+        onPress={() => router.push('/printer-setup')}
+      >
+        <Text style={styles.printerSetupLinkText}>
+          {isWeb ? '🖨 Receipt Printer / Device Name Setup' : '🖨 Receipt Printer Setup'}
+        </Text>
+      </Pressable>
     </>
   );
 
