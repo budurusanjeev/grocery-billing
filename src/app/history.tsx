@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getBills, loadPrinter, type Bill } from '../lib/db';
 import { requireInternet } from '../lib/network';
 import { printBillReceipt, printBillSystemDialog } from '../lib/printer';
@@ -10,14 +10,21 @@ import { formatMoney, showMessage } from '../lib/ui';
 const PAYMENT_ICON: Record<string, string> = { cash: '💵', upi: '📱', card: '💳' };
 const CUSTOMER_LABEL: Record<string, string> = { regular: 'Regular', retailer: 'Retailer', wholesaler: 'Wholesaler' };
 
-function isToday(isoDate: string): boolean {
+function startOfDay(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function isSameDay(isoDate: string, day: Date): boolean {
   const d = new Date(isoDate);
-  const now = new Date();
   return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
+    d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate()
   );
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 export default function HistoryScreen() {
@@ -27,11 +34,46 @@ export default function HistoryScreen() {
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printingSystemId, setPrintingSystemId] = useState<string | null>(null);
   const [lastUploadAt, setLastUploadAt] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     getBills().then(setBills);
     getLastUploadAt().then(setLastUploadAt);
   }, []);
+
+  const isToday = dayKey(selectedDate) === dayKey(startOfDay(new Date()));
+
+  // Distinct days that actually have a bill, newest first — lets the picker
+  // jump straight to a day instead of tapping ◀ repeatedly through empty
+  // days, and only ever lists real options.
+  const availableDays = useMemo(() => {
+    const byKey = new Map<string, { date: Date; count: number }>();
+    for (const b of bills) {
+      const d = startOfDay(new Date(b.created_at));
+      const key = dayKey(d);
+      const existing = byKey.get(key);
+      byKey.set(key, { date: d, count: (existing?.count ?? 0) + 1 });
+    }
+    return [...byKey.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [bills]);
+
+  const goToPreviousDay = () => {
+    const prev = availableDays.find((d) => d.date.getTime() < selectedDate.getTime());
+    if (prev) setSelectedDate(prev.date);
+  };
+
+  const goToNextDay = () => {
+    const candidates = availableDays.filter((d) => d.date.getTime() > selectedDate.getTime());
+    if (candidates.length > 0) {
+      setSelectedDate(candidates[candidates.length - 1].date);
+    } else if (!isToday) {
+      setSelectedDate(startOfDay(new Date()));
+    }
+  };
+
+  const hasPreviousDay = availableDays.some((d) => d.date.getTime() < selectedDate.getTime());
+  const hasNextDay = !isToday;
 
   const daysSinceUpload = useMemo(() => {
     if (!lastUploadAt) return null;
@@ -42,18 +84,18 @@ export default function HistoryScreen() {
     return Math.round((startOfToday.getTime() - startOfUploadDay.getTime()) / (24 * 60 * 60 * 1000));
   }, [lastUploadAt]);
 
-  const todaysBills = useMemo(() => bills.filter((b) => isToday(b.created_at)), [bills]);
-  const totalRevenue = useMemo(() => todaysBills.reduce((sum, b) => sum + b.total, 0), [todaysBills]);
+  const dayBills = useMemo(() => bills.filter((b) => isSameDay(b.created_at, selectedDate)), [bills, selectedDate]);
+  const totalRevenue = useMemo(() => dayBills.reduce((sum, b) => sum + b.total, 0), [dayBills]);
   const totalItems = useMemo(
-    () => todaysBills.reduce((sum, b) => sum + b.lines.reduce((n, l) => n + l.qty, 0), 0),
-    [todaysBills],
+    () => dayBills.reduce((sum, b) => sum + b.lines.reduce((n, l) => n + l.qty, 0), 0),
+    [dayBills],
   );
 
   const shareDaySummary = () => {
-    const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    const dateLabel = selectedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
     const text = [
-      `Kirana Bill — Day Summary (${today})`,
-      `Bills: ${todaysBills.length}`,
+      `Kirana Bill — Day Summary (${dateLabel})`,
+      `Bills: ${dayBills.length}`,
       `Total sales: ${formatMoney(totalRevenue)}`,
     ].join('\n');
     Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
@@ -124,11 +166,43 @@ export default function HistoryScreen() {
   };
 
   return (
+    <>
       <View style={styles.screen}>
+        <View style={styles.dateNavRow}>
+          <Pressable
+            style={({ pressed }) => [styles.dateNavBtn, !hasPreviousDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
+            android_ripple={ripple.onLight}
+            onPress={goToPreviousDay}
+            disabled={!hasPreviousDay}
+          >
+            <Text style={styles.dateNavBtnText}>◀</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dateLabelBtn, pressed && pressedDim]}
+            android_ripple={ripple.onLight}
+            onPress={() => setPickerOpen(true)}
+          >
+            <Text style={styles.dateLabelText}>
+              {isToday
+                ? 'Today'
+                : selectedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Text>
+            <Text style={styles.dateLabelHint}>📅 change</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.dateNavBtn, !hasNextDay && styles.dateNavBtnDisabled, pressed && pressedDim]}
+            android_ripple={ripple.onLight}
+            onPress={goToNextDay}
+            disabled={!hasNextDay}
+          >
+            <Text style={styles.dateNavBtnText}>▶</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.summaryCard}>
           <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{todaysBills.length}</Text>
-            <Text style={styles.summaryLabel}>Bills today</Text>
+            <Text style={styles.summaryValue}>{dayBills.length}</Text>
+            <Text style={styles.summaryLabel}>Bills</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryStat}>
@@ -142,7 +216,7 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {todaysBills.length > 0 && (
+        {dayBills.length > 0 && (
           <Pressable
             style={({ pressed }) => [styles.shareBtn, pressed && pressedDim]}
             android_ripple={ripple.onDark}
@@ -175,12 +249,12 @@ export default function HistoryScreen() {
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
-          data={todaysBills}
+          data={dayBills}
           keyExtractor={(b) => b.id}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Text style={styles.emptyIcon}>🧾</Text>
-              <Text style={styles.empty}>No bills saved yet today.</Text>
+              <Text style={styles.empty}>{isToday ? 'No bills saved yet today.' : 'No bills on this day.'}</Text>
             </View>
           }
           renderItem={({ item: bill }) => {
@@ -266,6 +340,48 @@ export default function HistoryScreen() {
           }}
         />
       </View>
+
+      <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
+        <Pressable style={styles.pickerBackdrop} onPress={() => setPickerOpen(false)}>
+          <View style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>Choose a day</Text>
+            <FlatList
+              data={availableDays}
+              keyExtractor={(d) => dayKey(d.date)}
+              style={styles.pickerList}
+              ListEmptyComponent={<Text style={styles.pickerEmpty}>No bills saved yet.</Text>}
+              renderItem={({ item }) => {
+                const isSelected = dayKey(item.date) === dayKey(selectedDate);
+                const isItemToday = dayKey(item.date) === dayKey(startOfDay(new Date()));
+                return (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.pickerRow,
+                      isSelected && styles.pickerRowActive,
+                      pressed && pressedDim,
+                    ]}
+                    android_ripple={ripple.onLight}
+                    onPress={() => {
+                      setSelectedDate(item.date);
+                      setPickerOpen(false);
+                    }}
+                  >
+                    <Text style={styles.pickerRowText}>
+                      {isItemToday
+                        ? 'Today'
+                        : item.date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </Text>
+                    <Text style={styles.pickerRowCount}>
+                      {item.count} bill{item.count > 1 ? 's' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -277,6 +393,52 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: spacing.listBottom,
   },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  dateNavBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  dateNavBtnDisabled: { opacity: 0.35 },
+  dateNavBtnText: { fontSize: 16, fontWeight: '700', color: colors.brand },
+  dateLabelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  dateLabelText: { fontSize: 16, fontWeight: '800', color: colors.text },
+  dateLabelHint: { fontSize: 11, color: colors.textFaint, marginTop: 1 },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.4)', justifyContent: 'flex-end' },
+  pickerSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: 16,
+    maxHeight: '70%',
+  },
+  pickerTitle: { fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: 10, textAlign: 'center' },
+  pickerList: { flexGrow: 0 },
+  pickerEmpty: { textAlign: 'center', color: colors.textFaint, fontSize: 14, paddingVertical: 20 },
+  pickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: radius.sm,
+  },
+  pickerRowActive: { backgroundColor: colors.brandLight },
+  pickerRowText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  pickerRowCount: { fontSize: 13, color: colors.textMuted },
   summaryCard: {
     flexDirection: 'row',
     backgroundColor: colors.brand,

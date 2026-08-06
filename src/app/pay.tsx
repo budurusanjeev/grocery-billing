@@ -401,25 +401,30 @@ export default function PayScreen() {
         </View>
 
         <View style={styles.qrPanel}>
-          {method === 'upi' && selectedQr ? (
-            <>
-              <Text style={styles.qrPanelLabel}>{selectedQr.label}</Text>
-              <View style={styles.qrImageWrap}>
-                <Image source={{ uri: selectedQr.imageUri }} style={styles.qrPanelImage} resizeMode="contain" />
-                <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFullQr(true)} />
+          {/* Scrollable — a 420px QR image plus label/hint can be taller
+              than the panel on shorter screens, which was compressing the
+              hint text against the bottom edge with no way to scroll to it. */}
+          <ScrollView style={styles.qrPanelScroll} contentContainerStyle={styles.qrPanelScrollContent}>
+            {method === 'upi' && selectedQr ? (
+              <>
+                <Text style={styles.qrPanelLabel}>{selectedQr.label}</Text>
+                <View style={styles.qrImageWrap}>
+                  <Image source={{ uri: selectedQr.imageUri }} style={styles.qrPanelImage} resizeMode="contain" />
+                  <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFullQr(true)} />
+                </View>
+                <Text style={styles.qrPanelHint}>Scan to pay {formatMoney(total)}</Text>
+              </>
+            ) : (
+              <View style={styles.qrPanelEmptyBox}>
+                <Text style={styles.qrPanelEmptyIcon}>📱</Text>
+                <Text style={styles.qrPanelEmptyText}>
+                  {method === 'upi'
+                    ? 'Pick a QR code on the left — it will appear here full-size for the customer to scan.'
+                    : 'Select UPI as the payment method to show a scannable QR code here.'}
+                </Text>
               </View>
-              <Text style={styles.qrPanelHint}>Scan to pay {formatMoney(total)}</Text>
-            </>
-          ) : (
-            <View style={styles.qrPanelEmptyBox}>
-              <Text style={styles.qrPanelEmptyIcon}>📱</Text>
-              <Text style={styles.qrPanelEmptyText}>
-                {method === 'upi'
-                  ? 'Pick a QR code on the left — it will appear here full-size for the customer to scan.'
-                  : 'Select UPI as the payment method to show a scannable QR code here.'}
-              </Text>
-            </View>
-          )}
+            )}
+          </ScrollView>
         </View>
         {fullQrModal}
       </View>
@@ -462,10 +467,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.card,
     borderRadius: radius.lg,
-    padding: 20,
+    ...raisedShadow,
+  },
+  qrPanelScroll: { flex: 1 },
+  qrPanelScrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    ...raisedShadow,
+    padding: 20,
   },
   qrPanelLabel: { fontSize: 20, fontWeight: '800', color: colors.brandDark, marginBottom: 16 },
   qrPanelImage: { width: '90%', maxWidth: 420, height: 420 },
