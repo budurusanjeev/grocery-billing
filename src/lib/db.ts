@@ -90,19 +90,43 @@ const BILLS_KEY = 'gb_bills_v1';
 const QRCODES_KEY = 'gb_qrcodes_v1';
 const PRINTER_KEY = 'gb_printer_v1';
 const BILLNUM_KEY = 'gb_billnum_v1';
+const DEVICE_LABEL_KEY = 'gb_device_label_v1';
 export const MAX_QRCODES = 10;
 
-// YYMM + a 3-digit counter, resetting to 001 whenever the month changes —
-// e.g. "2608001" for the 1st bill in August 2026. Per-device: two phones
-// used by the same shop will each count independently from 001, so the
-// same number could appear on both if they're not the only device in use.
+// A short name for this specific device (e.g. "PC", "Phone 1"), set once
+// via the Receipt Printer screen. Only meaningful when a shop bills from
+// more than one device — see nextBillNumber below.
+export async function getDeviceLabel(): Promise<string> {
+  const raw = await AsyncStorage.getItem(DEVICE_LABEL_KEY);
+  return raw ?? '';
+}
+
+export async function setDeviceLabel(label: string): Promise<void> {
+  await AsyncStorage.setItem(DEVICE_LABEL_KEY, label.trim());
+}
+
+// YY (year) + DD (day of month) + a 3-digit counter, resetting to 001 every
+// calendar day — e.g. "2604001" for the 1st bill on the 4th of the month.
+// Note this repeats across different months on the same day-of-month (the
+// 4th of August and the 4th of September both start with "2604") — the
+// counter resets by full date internally, only the displayed prefix omits
+// the month.
+//
+// The counter itself is per-device (each phone/PC counts its own bills
+// independently), so for a shop billing from more than one device, a
+// device label set via setDeviceLabel is appended (e.g. "2604001-PC" vs
+// "2604001-Phone1") so numbers from different devices can never collide.
+// No label set (the common single-device case) means no suffix at all.
 async function nextBillNumber(date: Date): Promise<string> {
-  const yearMonth = `${String(date.getFullYear()).slice(-2)}${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const yy = String(date.getFullYear()).slice(-2);
+  const dd = String(date.getDate()).padStart(2, '0');
+  const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
   const raw = await AsyncStorage.getItem(BILLNUM_KEY);
-  const state: { yearMonth: string; count: number } = raw ? JSON.parse(raw) : { yearMonth: '', count: 0 };
-  const count = state.yearMonth === yearMonth ? state.count + 1 : 1;
-  await AsyncStorage.setItem(BILLNUM_KEY, JSON.stringify({ yearMonth, count }));
-  return `${yearMonth}${String(count).padStart(3, '0')}`;
+  const state: { dayKey: string; count: number } = raw ? JSON.parse(raw) : { dayKey: '', count: 0 };
+  const count = state.dayKey === dayKey ? state.count + 1 : 1;
+  await AsyncStorage.setItem(BILLNUM_KEY, JSON.stringify({ dayKey, count }));
+  const label = await getDeviceLabel();
+  return `${yy}${dd}${String(count).padStart(3, '0')}${label ? `-${label}` : ''}`;
 }
 
 // AsyncStorage is used instead of sqlite so the exact same code runs on

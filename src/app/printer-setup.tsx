@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
-import { forgetPrinter, loadPrinter, savePrinter, type PrinterDevice } from '../lib/db';
+import { forgetPrinter, getDeviceLabel, loadPrinter, savePrinter, setDeviceLabel, type PrinterDevice } from '../lib/db';
 import { listPairedPrinters, scanNetworkPrinters, testConnectPrinter } from '../lib/printer';
 import { cardShadow, colors, isWeb, pressedDim, radius, ripple } from '../lib/theme';
 import { confirmDialog, showMessage } from '../lib/ui';
@@ -18,10 +18,60 @@ export default function PrinterSetupScreen() {
   const [scanningBluetooth, setScanningBluetooth] = useState(false);
   const [scanningNetwork, setScanningNetwork] = useState(false);
   const [connectingKey, setConnectingKey] = useState<string | null>(null);
+  const [deviceLabel, setDeviceLabelState] = useState('');
+  const [savedLabel, setSavedLabel] = useState('');
 
   useEffect(() => {
     loadPrinter().then(setPrinter);
+    getDeviceLabel().then((label) => {
+      setDeviceLabelState(label);
+      setSavedLabel(label);
+    });
   }, []);
+
+  const onSaveDeviceLabel = async () => {
+    await setDeviceLabel(deviceLabel);
+    setSavedLabel(deviceLabel.trim());
+    showMessage(
+      'Saved',
+      deviceLabel.trim()
+        ? `Bill numbers on this device will now end in "-${deviceLabel.trim()}".`
+        : 'Bill numbers on this device will no longer have a suffix.',
+    );
+  };
+
+  const deviceLabelSection = (
+    <View style={styles.deviceLabelCard}>
+      <Text style={styles.sectionLabel}>This device's name (for bill numbers)</Text>
+      <Text style={styles.deviceLabelHint}>
+        Only needed if this shop bills from more than one device (e.g. a PC and phones) — gives each
+        one's bill numbers a distinct suffix so they never clash, like 2604001-PC vs 2604001-Phone1.
+        Leave blank if this is the only device.
+      </Text>
+      <View style={styles.deviceLabelRow}>
+        <TextInput
+          style={styles.deviceLabelInput}
+          placeholder="e.g. PC, Phone1, Counter2"
+          placeholderTextColor={colors.textFaint}
+          value={deviceLabel}
+          onChangeText={setDeviceLabelState}
+          autoCapitalize="none"
+        />
+        <Pressable
+          style={({ pressed }) => [
+            styles.deviceLabelSaveBtn,
+            deviceLabel.trim() === savedLabel && styles.deviceLabelSaveBtnDisabled,
+            pressed && pressedDim,
+          ]}
+          android_ripple={ripple.onDark}
+          onPress={onSaveDeviceLabel}
+          disabled={deviceLabel.trim() === savedLabel}
+        >
+          <Text style={styles.deviceLabelSaveBtnText}>Save</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 
   const onScanBluetooth = async () => {
     setScanningBluetooth(true);
@@ -95,6 +145,7 @@ export default function PrinterSetupScreen() {
     return (
       <ScreenContainer>
         <View style={styles.screen}>
+          {deviceLabelSection}
           <View style={styles.webNotice}>
             <Text style={styles.webNoticeIcon}>🖨</Text>
             <Text style={styles.webNoticeText}>
@@ -112,6 +163,8 @@ export default function PrinterSetupScreen() {
   return (
     <ScreenContainer>
       <View style={styles.screen}>
+        {deviceLabelSection}
+
         <Text style={styles.hint}>
           Connect a receipt printer — Bluetooth (pair it with this phone in Android Settings →
           Bluetooth first) or a WiFi printer on the same network as this phone.
@@ -203,6 +256,34 @@ export default function PrinterSetupScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
   hint: { fontSize: 13, color: colors.textMuted, lineHeight: 19, marginBottom: 12 },
+  deviceLabelCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: 14,
+    marginBottom: 16,
+    ...cardShadow,
+  },
+  deviceLabelHint: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: 4, marginBottom: 10 },
+  deviceLabelRow: { flexDirection: 'row', gap: 8 },
+  deviceLabelInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  deviceLabelSaveBtn: {
+    backgroundColor: colors.brand,
+    borderRadius: radius.sm,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  deviceLabelSaveBtnDisabled: { backgroundColor: colors.border },
+  deviceLabelSaveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 14 },
   webNotice: { alignItems: 'center', marginTop: 40, paddingHorizontal: 20 },
   webNoticeIcon: { fontSize: 44, marginBottom: 12, opacity: 0.5 },
   webNoticeText: { textAlign: 'center', color: colors.textMuted, fontSize: 15, lineHeight: 22 },
