@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -114,7 +115,9 @@ export default function BillingScreen() {
       keyExtractor={(l) => l.itemId}
       ListEmptyComponent={
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>🧾</Text>
+          <Image source={require('../../assets/images/icon.png')} style={styles.emptyLogo} />
+          <Text style={styles.emptyBrandName}>Groci</Text>
+          <Text style={styles.emptyTagline}>Say it. Snap it. Done.</Text>
           <Text style={styles.empty}>
             Bill is empty.{'\n'}Search above, or use the buttons {isWeb ? 'on the right' : 'above'}.
           </Text>
@@ -393,7 +396,9 @@ const styles = StyleSheet.create({
   billList: { flex: 1, marginTop: 8 },
   listContent: { paddingBottom: 8 },
   emptyBox: { alignItems: 'center', marginTop: 36 },
-  emptyIcon: { fontSize: 40, marginBottom: 8, opacity: 0.5 },
+  emptyLogo: { width: 64, height: 64, marginBottom: 10, opacity: 0.9 },
+  emptyBrandName: { fontSize: 20, fontWeight: '800', color: colors.brandDark },
+  emptyTagline: { fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginTop: 2, marginBottom: 18 },
   empty: { textAlign: 'center', color: colors.textFaint, fontSize: 15, lineHeight: 24 },
   // A clean divider-separated list (like a receipt) instead of stacked
   // shadowed cards — on the wide 70% panel, individual full-width cards

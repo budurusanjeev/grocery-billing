@@ -42,7 +42,14 @@ function RootLayout() {
             >
               <Stack.Screen
                 name="index"
-                options={{ headerTitle: () => <Header title="Groci" subtitle="Billing" /> }}
+                options={{
+                  headerTitle: () => <Header title="Groci" subtitle="Billing" />,
+                  headerRight: () => (
+                    <Text style={styles.headerTagline} numberOfLines={1}>
+                      Say it. Snap it. Done.
+                    </Text>
+                  ),
+                }}
               />
               <Stack.Screen
                 name="catalog"
@@ -119,6 +126,12 @@ const styles = StyleSheet.create({
   crashText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
   crashBtn: { backgroundColor: colors.brand, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 32 },
   crashBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15 },
+  headerTagline: {
+    color: colors.brandLight,
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginRight: 16,
+  },
 });
 
 // Sentry.wrap adds touch-event breadcrumbs and performance instrumentation
