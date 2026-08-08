@@ -1,18 +1,27 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { colors } from '../lib/theme';
 
 interface HeaderProps {
   icon: string;
   title: string;
   subtitle?: string;
+  // Swaps the emoji badge for the real app icon -- used only for the
+  // "Groci" home screen, since every other screen's icon is a functional
+  // per-screen indicator (Catalog, Scan, etc.), not a brand mark.
+  logo?: boolean;
 }
 
-export default function Header({ icon, title, subtitle }: HeaderProps) {
+export default function Header({ icon, title, subtitle, logo }: HeaderProps) {
   return (
     <View style={styles.wrap}>
-      <View style={styles.badge}>
-        <Text style={styles.badgeIcon}>{icon}</Text>
-      </View>
+      {logo ? (
+        <Image source={require('../../assets/images/icon.png')} style={styles.logoImage} />
+      ) : (
+        <View style={styles.badge}>
+          <Text style={styles.badgeIcon}>{icon}</Text>
+        </View>
+      )}
       <View>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -32,6 +41,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeIcon: { fontSize: 18 },
+  logoImage: { width: 34, height: 34 },
   title: { color: '#ffffff', fontSize: 17, fontWeight: '800' },
-  subtitle: { color: '#bbf7d0', fontSize: 11, fontWeight: '500', marginTop: -1 },
+  subtitle: { color: colors.brandLight, fontSize: 11, fontWeight: '500', marginTop: -1 },
 });

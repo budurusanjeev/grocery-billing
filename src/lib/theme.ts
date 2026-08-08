@@ -1,14 +1,14 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  brand: '#166534',
-  brandDark: '#0f4c2a',
-  brandLight: '#dcfce7',
+  brand: '#15196C',
+  brandDark: '#0f124c',
+  brandLight: '#e4e5f5',
   accentPurple: '#7c3aed',
   accentBlue: '#0ea5e9',
   accentAmber: '#f59e0b',
   accentRed: '#dc2626',
-  bg: '#eef2f0',
+  bg: '#eef0f7',
   card: '#ffffff',
   border: '#e2e8f0',
   borderStrong: '#cbd5e1',

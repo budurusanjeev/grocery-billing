@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { requireInternet } from '../lib/network';
 import { cardShadow, colors, pressedDim, radius, ripple } from '../lib/theme';
@@ -33,8 +33,9 @@ export default function LoginScreen() {
     <ScreenContainer>
       <View style={styles.screen}>
         <View style={styles.header}>
-          <Text style={styles.logo}>🛒</Text>
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} />
           <Text style={styles.title}>Groci</Text>
+          <Text style={styles.tagline}>Say it. Snap it. Done.</Text>
           <Text style={styles.subtitle}>Log in to your shop</Text>
         </View>
 
@@ -87,9 +88,10 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: 20, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: 32 },
-  logo: { fontSize: 48, marginBottom: 8 },
+  logo: { width: 72, height: 72, marginBottom: 12 },
   title: { fontSize: 24, fontWeight: '800', color: colors.brandDark },
-  subtitle: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
+  tagline: { fontSize: 13, color: colors.textMuted, marginTop: 2, fontStyle: 'italic' },
+  subtitle: { fontSize: 14, color: colors.textMuted, marginTop: 10 },
   form: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
