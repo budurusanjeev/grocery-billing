@@ -42,38 +42,38 @@ function RootLayout() {
             >
               <Stack.Screen
                 name="index"
-                options={{ headerTitle: () => <Header logo icon="🛒" title="Groci" subtitle="Billing" /> }}
+                options={{ headerTitle: () => <Header title="Groci" subtitle="Billing" /> }}
               />
               <Stack.Screen
                 name="catalog"
-                options={{ headerTitle: () => <Header icon="🏷" title="Catalog" subtitle="Prices & items" /> }}
+                options={{ headerTitle: () => <Header title="Catalog" subtitle="Prices & items" /> }}
               />
               <Stack.Screen
                 name="scan"
-                options={{ headerTitle: () => <Header icon="📷" title="Scan List" subtitle="Paper → bill" /> }}
+                options={{ headerTitle: () => <Header title="Scan List" subtitle="Paper → bill" /> }}
               />
               <Stack.Screen
                 name="voice"
-                options={{ headerTitle: () => <Header icon="🎤" title="Voice Billing" subtitle="Speak items" /> }}
+                options={{ headerTitle: () => <Header title="Voice Billing" subtitle="Speak items" /> }}
               />
               <Stack.Screen
                 name="history"
                 options={{
-                  headerTitle: () => <Header icon="📊" title="Today's Bills" subtitle="Day summary" />,
+                  headerTitle: () => <Header title="Today's Bills" subtitle="Day summary" />,
                   headerLeft: () => <HeaderBackButton />,
                 }}
               />
               <Stack.Screen
                 name="pay"
-                options={{ headerTitle: () => <Header icon="💳" title="Payment" subtitle="Collect & confirm" /> }}
+                options={{ headerTitle: () => <Header title="Payment" subtitle="Collect & confirm" /> }}
               />
               <Stack.Screen
                 name="payment-qr"
-                options={{ headerTitle: () => <Header icon="📱" title="QR Codes" subtitle="UPI payment codes" /> }}
+                options={{ headerTitle: () => <Header title="QR Codes" subtitle="UPI payment codes" /> }}
               />
               <Stack.Screen
                 name="printer-setup"
-                options={{ headerTitle: () => <Header icon="🖨" title="Receipt Printer" subtitle="Bluetooth setup" /> }}
+                options={{ headerTitle: () => <Header title="Receipt Printer" subtitle="Bluetooth setup" /> }}
               />
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="forgot-pin" options={{ headerShown: false }} />

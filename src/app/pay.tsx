@@ -135,6 +135,8 @@ export default function PayScreen() {
       <ScreenContainer>
         <View style={styles.screen}>
           <View style={styles.successBox}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.brandLogo} />
+            <Text style={styles.brandName}>Groci</Text>
             <Text style={styles.successIcon}>✓</Text>
             <Text style={styles.successTitle}>Payment Recorded</Text>
             <Text style={styles.successAmount}>{formatMoney(paidAmount)}</Text>
@@ -510,6 +512,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  brandLogo: { width: 56, height: 56, marginBottom: -4 },
+  brandName: { fontSize: 18, fontWeight: '800', color: colors.brandDark, marginBottom: 8 },
   successIcon: {
     fontSize: 48,
     color: '#ffffff',
