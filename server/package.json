@@ -1,5 +1,5 @@
 {
-  "name": "grocery-billing-server",
+  "name": "gorci-server",
   "version": "1.0.0",
   "description": "Tiny backend for the grocery-billing app: keeps the Gemini API key server-side for the scan feature.",
   "main": "index.js",

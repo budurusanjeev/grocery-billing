@@ -67,7 +67,7 @@ export default function PayScreen() {
       setPaidBill(bill);
       const methodLabel = METHODS.find((m) => m.key === method)?.label ?? method;
       const text = [
-        `Kirana Bill${bill.billNumber ? ` #${bill.billNumber}` : ''}`,
+        `Gorci${bill.billNumber ? ` #${bill.billNumber}` : ''}`,
         ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
         ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
         ...lines.map(
@@ -108,7 +108,7 @@ export default function PayScreen() {
     }
     setPrinting(true);
     try {
-      await printBillReceipt(printer, paidBill, 'Kirana Bill');
+      await printBillReceipt(printer, paidBill, 'Gorci');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
     } finally {
@@ -120,7 +120,7 @@ export default function PayScreen() {
     if (!paidBill) return;
     setPrintingSystem(true);
     try {
-      await printBillSystemDialog(paidBill, 'Kirana Bill');
+      await printBillSystemDialog(paidBill, 'Gorci');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Something went wrong opening the print dialog.');
     } finally {

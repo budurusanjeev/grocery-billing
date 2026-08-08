@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A grocery shopkeeper billing tool for a Telangana kirana shop. Customers hand over grocery lists handwritten on paper (English/Telugu/Urdu), or the shopkeeper speaks items aloud — either way the app builds a bill with a live total. One Expo (React Native + TypeScript, SDK 57, expo-router) codebase targets both Android and web via react-native-web.
+**Gorci** — a grocery shopkeeper billing tool for a Telangana kirana shop. Customers hand over grocery lists handwritten on paper (English/Telugu/Urdu), or the shopkeeper speaks items aloud — either way the app builds a bill with a live total. One Expo (React Native + TypeScript, SDK 57, expo-router) codebase targets both Android and web via react-native-web.
 
 ## Commands
 

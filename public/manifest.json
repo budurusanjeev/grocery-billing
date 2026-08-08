@@ -1,6 +1,6 @@
 {
-  "name": "Kirana Bill",
-  "short_name": "Kirana Bill",
+  "name": "Gorci",
+  "short_name": "Gorci",
   "description": "Grocery billing for a kirana shop",
   "start_url": "/",
   "display": "standalone",
