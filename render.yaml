@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: grocery-billing-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  # Static web build of the Expo app (root directory, not `server`).
+  # EXPO_PUBLIC_SCAN_URL assumes the service above keeps the name
+  # "grocery-billing-server" — if Render suffixes it (name already taken),
+  # update this value to match the actual assigned URL after first deploy.
+  - type: web
+    name: grocery-billing-web
+    runtime: static
+    buildCommand: npm install && npx expo export -p web
+    staticPublishPath: ./dist
+    envVars:
+      - key: EXPO_PUBLIC_SCAN_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/scan
+      - key: EXPO_PUBLIC_ITEMS_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/items
+      - key: EXPO_PUBLIC_BILLS_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/bills
+      - key: EXPO_PUBLIC_QRCODES_URL
+        value: https://grocery-billing-server.onrender.com/api/v1/qrcodes
+      # Known values inlined directly (anon key isn't secret, unlike
+      # SUPABASE_SERVICE_ROLE_KEY above which stays sync:false).
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        value: https://flqwurfvryzifwfuyybm.supabase.co
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        value: sb_publishable_vL6d29DqZ_cUYjNxsAo28Q_SzI95Uz9
+      - key: EXPO_PUBLIC_RESET_PIN_URL
+        value: grocerybilling://reset-pin
+      # Crash/error reporting (src/lib/sentry.ts). Safe to inline like the
+      # Supabase anon key above -- a DSN is a write-only ingestion endpoint,
+      # not a secret.
+      - key: EXPO_PUBLIC_SENTRY_DSN
+        value: https://062dc0b04874ff0e160de55e6411207c@o4511862009692160.ingest.us.sentry.io/4511862019063808

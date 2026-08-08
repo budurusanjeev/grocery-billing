@@ -2,21 +2,28 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Linking,
+  Image,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { loadItems, saveBill, type Item } from '../lib/db';
+import { iconFor } from '../lib/categories';
+import { CUSTOMER_TYPES, loadItems, type Item } from '../lib/db';
 import { searchItems } from '../lib/matcher';
+import { cardShadow, colors, isWeb, pressedDim, radius, raisedShadow, ripple } from '../lib/theme';
 import { confirmDialog, formatMoney, showMessage } from '../lib/ui';
 import { useBill } from '../state/bill';
 
+// This screen deliberately does NOT use <ScreenContainer> — that component
+// centers everything in one narrow phone-width card, which is right for
+// every other screen but wrong here: this needs two genuinely separate
+// panels spanning the full width, not two columns squeezed inside one card.
 export default function BillingScreen() {
   const router = useRouter();
-  const { lines, total, addLine, updateQty, removeLine, clear } = useBill();
+  const { lines, customerType, setCustomerType, subtotal, discountRate, discount, total, addLine, updateQty, removeLine, clear } =
+    useBill();
   const [items, setItems] = useState<Item[]>([]);
   const [query, setQuery] = useState('');
 
@@ -25,200 +32,443 @@ export default function BillingScreen() {
   }, []);
 
   const results = useMemo(() => searchItems(query, items), [query, items]);
+  const categoryByItemId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const it of items) map.set(it.id, it.category);
+    return map;
+  }, [items]);
 
-  const onSaveBill = async () => {
+  const onPay = () => {
     if (lines.length === 0) {
       showMessage('Empty bill', 'Add some items first.');
       return;
     }
-    await saveBill(lines, total);
-    const text = [
-      'Kirana Bill',
-      ...lines.map((l) => `${l.name} — ${l.qty} ${l.unit} × ${formatMoney(l.price)} = ${formatMoney(l.price * l.qty)}`),
-      `Total: ${formatMoney(total)}`,
-    ].join('\n');
-    confirmDialog('Bill saved', 'Share this bill on WhatsApp?', () => {
-      Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
-    });
-    clear();
+    router.push('/pay');
   };
 
-  return (
-    <View style={styles.screen}>
+  const searchAndResults = (
+    <>
       <TextInput
         style={styles.search}
         placeholder="Search item… (rice, pappu, sabbu)"
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.textFaint}
         value={query}
         onChangeText={setQuery}
       />
       {results.length > 0 && (
         <View style={styles.results}>
           {results.map((item) => (
-            <TouchableOpacity
+            <Pressable
               key={item.id}
-              style={styles.resultRow}
+              style={({ pressed }) => [styles.resultRow, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
               onPress={() => {
                 addLine(item);
                 setQuery('');
               }}
             >
-              <Text style={styles.resultName}>
-                {item.name_en}
-                {item.brand ? ` (${item.brand})` : ''}
-              </Text>
-              <Text style={styles.resultTe}>{item.name_te}</Text>
+              <Text style={styles.resultIcon}>{iconFor(item.category)}</Text>
+              <View style={styles.resultInfo}>
+                <Text style={styles.resultName}>
+                  {item.name_en}
+                  {item.brand ? ` (${item.brand})` : ''}
+                </Text>
+                <Text style={styles.resultTe}>{item.name_te}</Text>
+              </View>
               <Text style={styles.resultPrice}>
                 {formatMoney(item.price)}/{item.unit}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       )}
+    </>
+  );
 
-      <FlatList
-        style={styles.billList}
-        data={lines}
-        keyExtractor={(l) => l.itemId}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            Bill is empty.{'\n'}Search above, or use Voice / Scan below.
-          </Text>
-        }
-        renderItem={({ item: l }) => (
-          <View style={styles.billRow}>
-            <View style={styles.billInfo}>
-              <Text style={styles.billName}>{l.name}</Text>
-              <Text style={styles.billMeta}>
-                {l.qty} {l.unit} × {formatMoney(l.price)}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty - 1)}>
-              <Text style={styles.qtyBtnText}>−</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(l.itemId, l.qty + 1)}>
-              <Text style={styles.qtyBtnText}>+</Text>
-            </TouchableOpacity>
-            <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
-            <TouchableOpacity onPress={() => removeLine(l.itemId)}>
-              <Text style={styles.remove}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
-
-      <View style={styles.totalBar}>
-        <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalValue}>{formatMoney(total)}</Text>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity style={[styles.action, styles.voice]} onPress={() => router.push('/voice')}>
-          <Text style={styles.actionText}>🎤 Voice</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.scan]} onPress={() => router.push('/scan')}>
-          <Text style={styles.actionText}>📷 Scan</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.catalog]} onPress={() => router.push('/catalog')}>
-          <Text style={styles.actionText}>🏷 Prices</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.action, styles.newBill]}
-          onPress={() =>
-            lines.length > 0 && confirmDialog('New bill', 'Clear the current bill?', clear)
-          }
+  const customerTypeRow = (
+    <View style={styles.customerTypeRow}>
+      {CUSTOMER_TYPES.map((c) => (
+        <Pressable
+          key={c.key}
+          style={({ pressed }) => [
+            styles.customerChip,
+            customerType === c.key && styles.customerChipActive,
+            pressed && pressedDim,
+          ]}
+          android_ripple={ripple.onLight}
+          onPress={() => setCustomerType(c.key)}
         >
-          <Text style={styles.actionText}>🗑 New Bill</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.action, styles.save]} onPress={onSaveBill}>
-          <Text style={styles.actionText}>💾 Save Bill</Text>
-        </TouchableOpacity>
+          <Text style={[styles.customerChipText, customerType === c.key && styles.customerChipTextActive]}>
+            {c.label}
+            {c.discountPercent > 0 ? ` (${c.discountPercent}% off)` : ''}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+
+  const billListEl = (
+    <FlatList
+      style={styles.billList}
+      contentContainerStyle={styles.listContent}
+      data={lines}
+      keyExtractor={(l) => l.itemId}
+      ListEmptyComponent={
+        <View style={styles.emptyBox}>
+          <Image source={require('../../assets/images/icon.png')} style={styles.emptyLogo} />
+          <Text style={styles.emptyBrandName}>Groci</Text>
+          <Text style={styles.emptyTagline}>Say it. Snap it. Done.</Text>
+          <Text style={styles.empty}>
+            Bill is empty.{'\n'}Search above, or use the buttons {isWeb ? 'on the right' : 'above'}.
+          </Text>
+        </View>
+      }
+      ItemSeparatorComponent={() => <View style={styles.billDivider} />}
+      renderItem={({ item: l }) => (
+        <View style={styles.billRow}>
+          <Text style={styles.billIcon}>{iconFor(categoryByItemId.get(l.itemId) ?? '')}</Text>
+          <View style={styles.billInfo}>
+            <Text style={styles.billName} numberOfLines={1}>
+              {l.name}
+            </Text>
+            <Text style={styles.billMeta}>
+              {l.qty} {l.unit} × {formatMoney(l.price)}
+            </Text>
+          </View>
+          <View style={styles.qtyGroup}>
+            <Pressable
+              style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
+              onPress={() => updateQty(l.itemId, l.qty - 1)}
+            >
+              <Text style={styles.qtyBtnText}>−</Text>
+            </Pressable>
+            <Text style={styles.qtyValue}>{l.qty}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.qtyBtn, pressed && pressedDim]}
+              android_ripple={ripple.onLight}
+              onPress={() => updateQty(l.itemId, l.qty + 1)}
+            >
+              <Text style={styles.qtyBtnText}>+</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.lineTotal}>{formatMoney(l.price * l.qty)}</Text>
+          <Pressable
+            style={({ pressed }) => [styles.removeBtn, pressed && pressedDim]}
+            android_ripple={ripple.onLight}
+            onPress={() => removeLine(l.itemId)}
+          >
+            <Text style={styles.remove}>✕</Text>
+          </Pressable>
+        </View>
+      )}
+    />
+  );
+
+  const navBtn = (
+    key: string,
+    icon: string,
+    label: string,
+    colorStyle: object,
+    onPress: () => void,
+    btnStyle: object,
+  ) => (
+    <Pressable
+      key={key}
+      style={({ pressed }) => [btnStyle, colorStyle, pressed && pressedDim]}
+      android_ripple={ripple.onDark}
+      onPress={onPress}
+    >
+      <Text style={styles.railIcon}>{icon}</Text>
+      <Text style={styles.railText}>{label}</Text>
+    </Pressable>
+  );
+
+  const onNewBill = () =>
+    lines.length > 0 && confirmDialog('New bill', 'Clear the current bill?', clear);
+
+  if (!isWeb) {
+    // Mobile: buttons live in a row at the top (no Pay — Pay sits with
+    // Total at the bottom, since that's the action taken right when
+    // checking out, not a navigation button).
+    return (
+      <View style={styles.mobileScreen}>
+        <View style={styles.topBtnRow}>
+          {navBtn('voice', '🎤', 'Voice', styles.voice, () => router.push('/voice'), styles.topBtn)}
+          {navBtn('scan', '📷', 'Scan', styles.scan, () => router.push('/scan'), styles.topBtn)}
+          {navBtn('catalog', '🏷', 'Prices', styles.catalog, () => router.push('/catalog'), styles.topBtn)}
+          {navBtn('history', '📊', 'Today', styles.history, () => router.push('/history'), styles.topBtn)}
+          {navBtn('newBill', '🗑', 'New', styles.newBill, onNewBill, styles.topBtn)}
+        </View>
+
+        <View style={styles.mobilePanel}>
+          {searchAndResults}
+          {billListEl}
+        </View>
+
+        {customerTypeRow}
+
+        <View style={styles.totalPayRow}>
+          <View style={styles.totalBarMobile}>
+            <View>
+              <Text style={styles.totalLabel}>Total</Text>
+              {discount > 0 && (
+                <Text style={styles.discountHint}>
+                  {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.payBtnMobile, pressed && pressedDim]}
+            android_ripple={ripple.onDark}
+            onPress={onPay}
+          >
+            <Text style={styles.railIcon}>💳</Text>
+            <Text style={styles.railText}>Pay</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.page}>
+      <View style={styles.itemsPanel}>
+        {searchAndResults}
+        {billListEl}
+        {customerTypeRow}
+
+        <View style={styles.totalBar}>
+          <View>
+            <Text style={styles.totalLabel}>Total</Text>
+            {discount > 0 && (
+              <Text style={styles.discountHint}>
+                {formatMoney(subtotal)} − {discountRate}% = −{formatMoney(discount)}
+              </Text>
+            )}
+          </View>
+          <Text style={styles.totalValue}>{formatMoney(total)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.buttonsPanel}>
+        {navBtn('voice', '🎤', 'Voice', styles.voice, () => router.push('/voice'), styles.railBtn)}
+        {navBtn('scan', '📷', 'Scan', styles.scan, () => router.push('/scan'), styles.railBtn)}
+        {navBtn('catalog', '🏷', 'Prices', styles.catalog, () => router.push('/catalog'), styles.railBtn)}
+        {navBtn('history', '📊', 'Today', styles.history, () => router.push('/history'), styles.railBtn)}
+        {navBtn('newBill', '🗑', 'New', styles.newBill, onNewBill, styles.railBtn)}
+        {navBtn('pay', '💳', 'Pay', styles.pay, onPay, styles.railBtn)}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc', padding: 12 },
+  page: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.bg,
+    padding: 12,
+    gap: 12,
+  },
+  // Two genuinely separate panels — each its own card with its own
+  // background/shadow/rounded corners — not two columns inside one shared
+  // container. Widths are explicit percentages of the full page, which
+  // itself is NOT centered/width-capped (unlike every other screen's
+  // <ScreenContainer>), so this uses the whole browser width on web.
+  itemsPanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 12,
+    ...raisedShadow,
+  },
+  // Fixed max width, NOT a percentage — on a wide monitor, 30% of the full
+  // page is still 400-500px, which is what stretched the buttons huge.
+  buttonsPanel: {
+    width: '30%',
+    maxWidth: 150,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 10,
+    gap: 8,
+    ...raisedShadow,
+  },
+  railBtn: {
+    // Fixed height, not flex:1 — flex:1 made each button stretch to fill
+    // the panel's full height (nearly the whole screen), which combined
+    // with the width made them look like giant stretched rectangles.
+    height: 68,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  railIcon: { fontSize: 18 },
+  railText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  // Mobile-only layout: a horizontal row of nav buttons at the top, one
+  // full-width panel below for search+list, and Total+Pay combined into a
+  // single bottom row (Pay sits next to Total, not in the top nav row,
+  // since it's the checkout action rather than a screen-navigation button).
+  mobileScreen: { flex: 1, backgroundColor: colors.bg, padding: 12 },
+  topBtnRow: { flexDirection: 'row', gap: 6 },
+  topBtn: {
+    flex: 1,
+    height: 60,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  mobilePanel: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: 12,
+    marginTop: 10,
+    ...raisedShadow,
+  },
+  totalPayRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  totalBarMobile: {
+    flex: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.brand,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    ...cardShadow,
+  },
+  payBtnMobile: {
+    flex: 1,
+    backgroundColor: '#16a34a',
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  voice: { backgroundColor: colors.accentPurple },
+  scan: { backgroundColor: colors.accentBlue },
+  catalog: { backgroundColor: colors.accentAmber },
+  newBill: { backgroundColor: '#64748b' },
+  history: { backgroundColor: '#0d9488' },
+  pay: { backgroundColor: '#16a34a' },
   search: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.bg,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
   },
   results: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    marginTop: 6,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    marginTop: 4,
+    borderColor: colors.border,
   },
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  resultName: { fontSize: 15, fontWeight: '600', color: '#0f172a', flexShrink: 1 },
-  resultTe: { fontSize: 13, color: '#64748b', flex: 1 },
-  resultPrice: { fontSize: 14, fontWeight: '700', color: '#166534' },
-  billList: { flex: 1, marginTop: 10 },
-  empty: { textAlign: 'center', color: '#94a3b8', marginTop: 40, fontSize: 15, lineHeight: 24 },
+  resultIcon: { fontSize: 30 },
+  resultInfo: { flex: 1 },
+  resultName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  resultTe: { fontSize: 13, color: colors.textMuted },
+  resultPrice: { fontSize: 14, fontWeight: '700', color: colors.brand },
+  billList: { flex: 1, marginTop: 8 },
+  listContent: { paddingBottom: 8 },
+  emptyBox: { alignItems: 'center', marginTop: 36 },
+  emptyLogo: { width: 64, height: 64, marginBottom: 10, opacity: 0.9 },
+  emptyBrandName: { fontSize: 20, fontWeight: '800', color: colors.brandDark },
+  emptyTagline: { fontSize: 13, color: colors.textMuted, fontStyle: 'italic', marginTop: 2, marginBottom: 18 },
+  empty: { textAlign: 'center', color: colors.textFaint, fontSize: 15, lineHeight: 24 },
+  // A clean divider-separated list (like a receipt) instead of stacked
+  // shadowed cards — on the wide 70% panel, individual full-width cards
+  // with flex-pushed content just left a big dead gap between the name and
+  // the controls. Capping billInfo's width and grouping the qty stepper
+  // into its own pill keeps the row content close together instead of
+  // stretched corner-to-corner.
+  billDivider: { height: 1, backgroundColor: colors.border, marginHorizontal: 2 },
   billRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 6,
-    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    gap: 10,
   },
-  billInfo: { flex: 1 },
-  billName: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  billMeta: { fontSize: 13, color: '#64748b' },
+  billIcon: { fontSize: 24, width: 30, textAlign: 'center' },
+  billInfo: { flex: 1, maxWidth: 260 },
+  billName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  billMeta: { fontSize: 13, color: colors.textMuted, marginTop: 1 },
+  qtyGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    padding: 3,
+    gap: 2,
+  },
   qtyBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  qtyBtnText: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  lineTotal: { fontSize: 15, fontWeight: '700', color: '#166534', minWidth: 60, textAlign: 'right' },
-  remove: { color: '#dc2626', fontSize: 16, paddingHorizontal: 6 },
+  qtyBtnText: { fontSize: 16, fontWeight: '700', color: colors.text },
+  qtyValue: { fontSize: 14, fontWeight: '700', color: colors.text, minWidth: 26, textAlign: 'center' },
+  lineTotal: { fontSize: 15, fontWeight: '700', color: colors.brand, minWidth: 70, textAlign: 'right' },
+  removeBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  remove: { color: colors.accentRed, fontSize: 16 },
   totalBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#166534',
-    borderRadius: 12,
+    backgroundColor: colors.brand,
+    borderRadius: radius.lg,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 6,
-  },
-  totalLabel: { color: '#bbf7d0', fontSize: 16, fontWeight: '600' },
-  totalValue: { color: '#ffffff', fontSize: 24, fontWeight: '800' },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  action: {
-    flex: 1,
-    borderRadius: 10,
     paddingVertical: 14,
-    alignItems: 'center',
+    marginTop: 8,
   },
-  voice: { backgroundColor: '#7c3aed' },
-  scan: { backgroundColor: '#0ea5e9' },
-  catalog: { backgroundColor: '#f59e0b' },
-  newBill: { backgroundColor: '#64748b' },
-  save: { backgroundColor: '#16a34a' },
-  actionText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  totalLabel: { color: colors.brandLight, fontSize: 16, fontWeight: '600' },
+  totalValue: { color: '#ffffff', fontSize: 26, fontWeight: '800' },
+  discountHint: { color: colors.brandLight, fontSize: 11, marginTop: 2 },
+  customerTypeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  customerChip: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  customerChipActive: { backgroundColor: colors.brandLight, borderColor: colors.brand },
+  customerChipText: { fontSize: 12.5, fontWeight: '700', color: colors.textMuted },
+  customerChipTextActive: { color: colors.brandDark },
 });
