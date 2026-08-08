@@ -1,11 +1,11 @@
 {
-  "name": "Gorci",
-  "short_name": "Gorci",
+  "name": "Groci",
+  "short_name": "Groci",
   "description": "Grocery billing for a kirana shop",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#eef2f0",
-  "theme_color": "#166534",
+  "background_color": "#15196C",
+  "theme_color": "#15196C",
   "icons": [
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "192x192", "type": "image/png" }

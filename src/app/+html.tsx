@@ -12,7 +12,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <meta name="theme-color" content="#166534" />
+        <meta name="theme-color" content="#15196C" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-512.png" />
         <ScrollViewStyleReset />

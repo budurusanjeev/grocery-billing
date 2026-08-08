@@ -34,7 +34,7 @@ export default function LoginScreen() {
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.logo}>🛒</Text>
-          <Text style={styles.title}>Gorci</Text>
+          <Text style={styles.title}>Groci</Text>
           <Text style={styles.subtitle}>Log in to your shop</Text>
         </View>
 

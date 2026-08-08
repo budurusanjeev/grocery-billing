@@ -42,7 +42,7 @@ function RootLayout() {
             >
               <Stack.Screen
                 name="index"
-                options={{ headerTitle: () => <Header icon="🛒" title="Gorci" subtitle="Billing" /> }}
+                options={{ headerTitle: () => <Header icon="🛒" title="Groci" subtitle="Billing" /> }}
               />
               <Stack.Screen
                 name="catalog"

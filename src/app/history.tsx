@@ -94,7 +94,7 @@ export default function HistoryScreen() {
   const shareDaySummary = () => {
     const dateLabel = selectedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
     const text = [
-      `Gorci — Day Summary (${dateLabel})`,
+      `Groci — Day Summary (${dateLabel})`,
       `Bills: ${dayBills.length}`,
       `Total sales: ${formatMoney(totalRevenue)}`,
     ].join('\n');
@@ -124,7 +124,7 @@ export default function HistoryScreen() {
       minute: '2-digit',
     });
     const text = [
-      `Gorci${bill.billNumber ? ` #${bill.billNumber}` : ''} — ${time}`,
+      `Groci${bill.billNumber ? ` #${bill.billNumber}` : ''} — ${time}`,
       ...(bill.customerName ? [`Customer: ${bill.customerName}`] : []),
       ...(bill.customerMobile ? [`Mobile: ${bill.customerMobile}`] : []),
       ...bill.lines.map(
@@ -146,7 +146,7 @@ export default function HistoryScreen() {
     }
     setPrintingId(bill.id);
     try {
-      await printBillReceipt(printer, bill, 'Gorci');
+      await printBillReceipt(printer, bill, 'Groci');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Make sure the printer is turned on and nearby.');
     } finally {
@@ -157,7 +157,7 @@ export default function HistoryScreen() {
   const printBillSystem = async (bill: Bill) => {
     setPrintingSystemId(bill.id);
     try {
-      await printBillSystemDialog(bill, 'Gorci');
+      await printBillSystemDialog(bill, 'Groci');
     } catch (e: any) {
       showMessage('Could not print', e?.message ?? 'Something went wrong opening the print dialog.');
     } finally {
